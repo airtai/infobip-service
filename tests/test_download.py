@@ -88,16 +88,15 @@ def test_create_db_uri_for_clickhouse_datablob():
     ), actual
 
 
-# get_clickhouse_params_from_env_vars TESTS
 def test_get_clickhouse_params_from_env_vars():
     # Set the required environment variables
-    os.environ["INFOBIP_DATABASE"] = "infobip"
-    os.environ["INFOBIP_HOST"] = "localhost"
-    os.environ["INFOBIP_PASSWORD"] = "password" #pragma: allowlist secret
-    os.environ["INFOBIP_PORT"] = "8123"
-    os.environ["INFOBIP_PROTOCOL"] = "http"
-    os.environ["INFOBIP_TABLE"] = "events"
-    os.environ["INFOBIP_USERNAME"] = "default"
+    os.environ["KAFKA_CH_DATABASE"] = "infobip"
+    os.environ["KAFKA_CH_HOST"] = "localhost"
+    os.environ["KAFKA_CH_PASSWORD"] = "password" #pragma: allowlist secret
+    os.environ["KAFKA_CH_PORT"] = "8123"
+    os.environ["KAFKA_CH_PROTOCOL"] = "http"
+    os.environ["KAFKA_CH_TABLE"] = "events"
+    os.environ["KAFKA_CH_USERNAME"] = "default"
 
     # Test case 1: Check if all required keys are present in the returned dictionary
     expected_keys = ["database", "host", "password", "port", "protocol", "table", "username"]
@@ -112,15 +111,6 @@ def test_get_clickhouse_params_from_env_vars():
     assert isinstance(params["protocol"], str)
     assert isinstance(params["table"], str)
     assert isinstance(params["username"], str)
-
-    # Clean up the environment variables
-    del os.environ["INFOBIP_DATABASE"]
-    del os.environ["INFOBIP_HOST"]
-    del os.environ["INFOBIP_PASSWORD"]
-    del os.environ["INFOBIP_PORT"]
-    del os.environ["INFOBIP_PROTOCOL"]
-    del os.environ["INFOBIP_TABLE"]
-    del os.environ["INFOBIP_USERNAME"]
 
 
 def test_fill_na():

@@ -1,3 +1,4 @@
+import logging
 import tempfile
 from contextlib import contextmanager
 from os import environ
@@ -65,15 +66,15 @@ def create_db_uri_for_clickhouse_datablob(
 
 
 def get_clickhouse_params_from_env_vars() -> Dict[str, Union[str, int]]:
-    return dict(
-        username=environ["KAFKA_CH_USERNAME"],
-        password=environ["KAFKA_CH_PASSWORD"],
-        host=environ["KAFKA_CH_HOST"],
-        database=environ["KAFKA_CH_DATABASE"],
-        port=int(environ["KAFKA_CH_PORT"]),
-        protocol=environ["KAFKA_CH_PROTOCOL"],
-        table=environ["KAFKA_CH_TABLE"],
-    )
+    return {
+        "username": environ["KAFKA_CH_USERNAME"],
+        "password": environ["KAFKA_CH_PASSWORD"],
+        "host": environ["KAFKA_CH_HOST"],
+        "database": environ["KAFKA_CH_DATABASE"],
+        "port": int(environ["KAFKA_CH_PORT"]),
+        "protocol": environ["KAFKA_CH_PROTOCOL"],
+        "table": environ["KAFKA_CH_TABLE"],
+    }
 
 
 @contextmanager  # type: ignore
@@ -100,7 +101,7 @@ def get_clickhouse_connection(  # type: ignore
     )
     db_engine = create_engine(conn_str)
     with db_engine.connect() as connection:
-        print(f"Connected to database using {db_engine}")
+        logging.info(f"Connected to database using {db_engine}")
         yield connection
 
 
@@ -177,18 +178,18 @@ def _download_account_id_rows_as_parquet(
         if history_size:
             query = query + f" LIMIT {history_size} BY PersonId"
 
-        print(f"_download_account_id_rows_as_parquet(): {query=}")
+        logging.info(f"_download_account_id_rows_as_parquet(): {query=}")
 
         (d / "downloaded").mkdir(parents=True, exist_ok=True)
         for df in pd.read_sql(sql=query, con=connection, chunksize=chunksize):
             fname = d / "downloaded" / f"clickhouse_data_{i:09d}.parquet"
-            print(
+            logging.info(
                 f"_download_account_id_rows_as_parquet() Writing data retrieved from the database to temporary file: {fname}"
             )
             df.to_parquet(fname, engine="pyarrow")  # type: ignore
             i = i + 1
 
-        print(
+        logging.info(
             f"_download_account_id_rows_as_parquet() Rewriting temporary parquet files from {d / 'clickhouse_data_*.parquet'} to output directory {output_path}"
         )
         _pandas2dask(d / "downloaded", output_path)
@@ -233,4 +234,4 @@ if __name__ == "__main__":
     )
 
     ddf = dd.read_parquet(raw_data_path)  # type: ignore
-    print(f"{ddf.shape[0].compute()=:,d}")
+    logging.info(f"{ddf.shape[0].compute()=:,d}")
