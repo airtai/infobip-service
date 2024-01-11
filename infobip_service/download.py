@@ -1,4 +1,3 @@
-# | export
 from os import environ
 import re
 from pathlib import Path
@@ -15,9 +14,6 @@ import dask.dataframe as dd
 
 raw_data_path = Path() / ".." / "data" / "raw"
 
-# export
-
-
 def _create_clickhouse_connection_string(
     username: str,
     password: str,
@@ -33,10 +29,6 @@ def _create_clickhouse_connection_string(
     )
 
     return conn_str
-
-
-# export
-
 
 def create_db_uri_for_clickhouse_datablob(
     username: str,
@@ -72,31 +64,6 @@ def create_db_uri_for_clickhouse_datablob(
     clickhouse_uri = f"{clickhouse_uri}/{table}"
     return clickhouse_uri
 
-# export
-
-
-def _get_clickhouse_connection_params_from_db_uri(
-    db_uri: str,
-) -> Tuple[str, str, str, int, str, str, str, str]:
-    """Function to get clickhouse connection params from db_uri of the db datablob
-
-    Args:
-        db_uri: DB uri of db datablob
-    Returns:
-        The username, password, host, port, table, database, protocol, database_server of the db datablob as a tuple
-    """
-    result = re.search(r"(.*)\+(.*):\/\/(.*):(.*)@(.*):(.*)\/(.*)\/(.*)", db_uri)
-    database_server = result.group(1)  # type: ignore
-    protocol = result.group(2)  # type: ignore
-    username = result.group(3)  # type: ignore
-    password = urlunquote(urlunquote(result.group(4)))  # type: ignore
-    host = result.group(5)  # type: ignore
-    port = int(result.group(6))  # type: ignore
-    database = result.group(7)  # type: ignore
-    table = result.group(8)  # type: ignore
-    return username, password, host, port, table, database, protocol, database_server
-
-
 def get_clickhouse_params_from_env_vars() -> Dict[str, Union[str, int]]:
     return dict(
         username=environ["KAFKA_CH_USERNAME"],
@@ -130,20 +97,14 @@ def get_clickhouse_connection(  # type: ignore
         database=database,
         protocol=protocol,
     )
-
-#     print(f"{conn_str=}")
-
     db_engine = create_engine(conn_str)
-    # args, kwargs = db_engine.dialect.create_connect_args(db_engine.url)
     with db_engine.connect() as connection:
         print(f"Connected to database using {db_engine}")
         yield connection
 
-# export
 
 def fillna(s: Optional[Any]) -> str:
     quote = "'"
-#     return f"{quote + '' + quote if (s is None) else quote + str(s) + quote}"
     return f"{quote + ('' if s is None else str(s)) + quote}"
 
 
@@ -155,7 +116,6 @@ def _pandas2dask_map(df: pd.DataFrame, *, history_size: Optional[int] = None) ->
     df = df.set_index("PersonId")
     return df
 
-# export
 
 def _pandas2dask(downloaded_path: Path, output_path: Path, *, history_size: Optional[int] = None) -> None:
     with tempfile.TemporaryDirectory() as td:
@@ -180,8 +140,6 @@ def _pandas2dask(downloaded_path: Path, output_path: Path, *, history_size: Opti
 
         ddf.to_parquet(output_path)
 
-# export
-
 def _download_account_id_rows_as_parquet(
     *,
     account_id: Union[int, str],
@@ -195,7 +153,6 @@ def _download_account_id_rows_as_parquet(
     protocol: str,
     table: str,
     chunksize: Optional[int] = 1_000_000,
-    index_column: str = "PersonId",
     output_path: Path,
 ) -> None:
 
