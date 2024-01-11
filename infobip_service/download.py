@@ -1,18 +1,16 @@
-from os import environ
-import re
-from pathlib import Path
 import tempfile
-from typing import Union, Optional, Tuple, Dict, Any
 from contextlib import contextmanager
+from os import environ
+from pathlib import Path
+from typing import Any, Dict, Optional, Union
 from urllib.parse import quote_plus as urlquote
-from urllib.parse import unquote_plus as urlunquote
-from datetime import datetime, timedelta
 
-from sqlalchemy.engine import Connection, create_engine
-import pandas as pd
 import dask.dataframe as dd
+import pandas as pd
+from sqlalchemy.engine import Connection, create_engine
 
 raw_data_path = Path() / ".." / "data" / "raw"
+
 
 def _create_clickhouse_connection_string(
     username: str,
@@ -30,6 +28,7 @@ def _create_clickhouse_connection_string(
 
     return conn_str
 
+
 def create_db_uri_for_clickhouse_datablob(
     username: str,
     password: str,
@@ -39,7 +38,7 @@ def create_db_uri_for_clickhouse_datablob(
     database: str,
     protocol: str,
 ) -> str:
-    """Create uri for clickhouse datablob based on connection params
+    """Create uri for clickhouse datablob based on connection params.
 
     Args:
         username: Username of clickhouse database
@@ -64,6 +63,7 @@ def create_db_uri_for_clickhouse_datablob(
     clickhouse_uri = f"{clickhouse_uri}/{table}"
     return clickhouse_uri
 
+
 def get_clickhouse_params_from_env_vars() -> Dict[str, Union[str, int]]:
     return dict(
         username=environ["KAFKA_CH_USERNAME"],
@@ -74,6 +74,7 @@ def get_clickhouse_params_from_env_vars() -> Dict[str, Union[str, int]]:
         protocol=environ["KAFKA_CH_PROTOCOL"],
         table=environ["KAFKA_CH_TABLE"],
     )
+
 
 @contextmanager  # type: ignore
 def get_clickhouse_connection(  # type: ignore
@@ -108,8 +109,9 @@ def fillna(s: Optional[Any]) -> str:
     return f"{quote + ('' if s is None else str(s)) + quote}"
 
 
-
-def _pandas2dask_map(df: pd.DataFrame, *, history_size: Optional[int] = None) -> pd.DataFrame:
+def _pandas2dask_map(
+    df: pd.DataFrame, *, history_size: Optional[int] = None
+) -> pd.DataFrame:
     df = df.reset_index()
     df = df.sort_values(["PersonId", "OccurredTime", "OccurredTimeTicks"])
     df = df.drop_duplicates()
@@ -117,28 +119,29 @@ def _pandas2dask_map(df: pd.DataFrame, *, history_size: Optional[int] = None) ->
     return df
 
 
-def _pandas2dask(downloaded_path: Path, output_path: Path, *, history_size: Optional[int] = None) -> None:
+def _pandas2dask(
+    downloaded_path: Path, output_path: Path, *, history_size: Optional[int] = None
+) -> None:
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
 
-        ddf = dd.read_parquet(
+        ddf = dd.read_parquet(  # type: ignore
             downloaded_path,
             blocksize=None,
         )
         ddf["AccountId"] = ddf["AccountId"].astype("int64")
-        
+
         # set index
         ddf = ddf.set_index("PersonId")
         ddf.to_parquet(d, engine="pyarrow")
 
         # deduplicate and sort by PersonId and OccurredTime
-        ddf = dd.read_parquet(
-            d
-        )
+        ddf = dd.read_parquet(d)  # type: ignore
 
         ddf = ddf.map_partitions(_pandas2dask_map)
 
         ddf.to_parquet(output_path)
+
 
 def _download_account_id_rows_as_parquet(
     *,
@@ -155,7 +158,6 @@ def _download_account_id_rows_as_parquet(
     chunksize: Optional[int] = 1_000_000,
     output_path: Path,
 ) -> None:
-
     with get_clickhouse_connection(  # type: ignore
         username=username,
         password=password,
@@ -164,39 +166,37 @@ def _download_account_id_rows_as_parquet(
         database=database,
         table=table,
         protocol=protocol,
-    ) as connection:
+    ) as connection, tempfile.TemporaryDirectory() as td:
+        d = Path(td)
+        i = 0
 
-        with tempfile.TemporaryDirectory() as td:
-            d = Path(td)
-            i = 0
+        query = f"SELECT DISTINCT * FROM {table} WHERE AccountId={account_id}"  # nosec B608
+        if application_id is not None and application_id != "":
+            query = query + f" AND ApplicationId='{application_id}'"
+        query = query + " ORDER BY PersonId ASC, OccurredTimeTicks DESC"
+        if history_size:
+            query = query + f" LIMIT {history_size} BY PersonId"
 
-            query = f"SELECT DISTINCT * FROM {table} WHERE AccountId={account_id}" # nosec B608
-            if application_id is not None and application_id != "":
-                 query = query + f" AND ApplicationId='{application_id}'"
-            query = query + " ORDER BY PersonId ASC, OccurredTimeTicks DESC"
-            if history_size:
-                query = query + f" LIMIT {history_size} BY PersonId"
-    
-            print(f"_download_account_id_rows_as_parquet(): {query=}")
+        print(f"_download_account_id_rows_as_parquet(): {query=}")
 
-            (d / "downloaded").mkdir(parents=True, exist_ok=True)
-            for df in pd.read_sql(sql=query, con=connection, chunksize=chunksize):
-                fname = d / "downloaded" / f"clickhouse_data_{i:09d}.parquet"
-                print(
-                    f"_download_account_id_rows_as_parquet() Writing data retrieved from the database to temporary file: {fname}"
-                )
-                df.to_parquet(fname, engine="pyarrow")  # type: ignore
-                i = i + 1
-                
+        (d / "downloaded").mkdir(parents=True, exist_ok=True)
+        for df in pd.read_sql(sql=query, con=connection, chunksize=chunksize):
+            fname = d / "downloaded" / f"clickhouse_data_{i:09d}.parquet"
             print(
-                f"_download_account_id_rows_as_parquet() Rewriting temporary parquet files from {d / f'clickhouse_data_*.parquet'} to output directory {output_path}"
+                f"_download_account_id_rows_as_parquet() Writing data retrieved from the database to temporary file: {fname}"
             )
-            _pandas2dask(d / "downloaded", output_path)
-                        
-            # test if everything is ok
-            test_ddf = dd.read_parquet(output_path).head()           
-           
-           
+            df.to_parquet(fname, engine="pyarrow")  # type: ignore
+            i = i + 1
+
+        print(
+            f"_download_account_id_rows_as_parquet() Rewriting temporary parquet files from {d / 'clickhouse_data_*.parquet'} to output directory {output_path}"
+        )
+        _pandas2dask(d / "downloaded", output_path)
+
+        # test if everything is ok
+        dd.read_parquet(output_path).head()  # type: ignore
+
+
 def download_account_id_rows_as_parquet(
     *,
     account_id: Union[int, str],
@@ -206,9 +206,8 @@ def download_account_id_rows_as_parquet(
     index_column: str = "PersonId",
     output_path: Path,
 ) -> None:
-    
     db_params = get_clickhouse_params_from_env_vars()
-    
+
     return _download_account_id_rows_as_parquet(
         account_id=account_id,
         application_id=application_id,
@@ -216,13 +215,13 @@ def download_account_id_rows_as_parquet(
         chunksize=chunksize,
         index_column=index_column,
         output_path=output_path,
-        **db_params, # type: ignore
+        **db_params,  # type: ignore
     )
 
 
 if __name__ == "__main__":
-    AccountId=12344
-    ModelId=20062
+    AccountId = 12344
+    ModelId = 20062
     ApplicationId = None
 
     raw_data_path.mkdir(exist_ok=True, parents=True)
@@ -233,5 +232,5 @@ if __name__ == "__main__":
         output_path=raw_data_path,
     )
 
-    ddf = dd.read_parquet(raw_data_path)
+    ddf = dd.read_parquet(raw_data_path)  # type: ignore
     print(f"{ddf.shape[0].compute()=:,d}")

@@ -2,7 +2,7 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/python
 {
 	"name": "Python 3",
-	"image": "mcr.microsoft.com/devcontainers/python:1-3.12-bullseye",
+	"build": { "dockerfile": "Dockerfile" },
 
 	"remoteEnv": {
 		"KAFKA_CH_TABLE": "${localEnv:KAFKA_CH_TABLE}",
@@ -14,7 +14,7 @@
 		"KAFKA_CH_PASSWORD": "${localEnv:KAFKA_CH_PASSWORD}"
 	},
 
-	"postCreateCommand": "pip install -e .\"[dev]\" && pre-commit install",
+	"postCreateCommand": "pip install -e .\"[dev]\"",// && pre-commit install",
 	"mounts": [
 		"type=bind,source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,readonly"
 	  ]

@@ -47,7 +47,7 @@ def test_clickhouse_connection_string():
         protocol="native",
     )
     assert (
-        actual == "clickhouse+native://default:123%253F456%2540@localhost:9000/infobip"
+        actual == "clickhouse+native://default:123%253F456%2540@localhost:9000/infobip" #pragma: allowlist secret
     ), actual
 
 def test_create_db_uri_for_clickhouse_datablob():
@@ -84,7 +84,7 @@ def test_create_db_uri_for_clickhouse_datablob():
     )
     assert (
         actual
-        == "clickhouse+native://default:123%253F456%2540@localhost:9000/infobip/events"
+        == "clickhouse+native://default:123%253F456%2540@localhost:9000/infobip/events" #pragma: allowlist secret
     ), actual
 
 
@@ -93,7 +93,7 @@ def test_get_clickhouse_params_from_env_vars():
     # Set the required environment variables
     os.environ["INFOBIP_DATABASE"] = "infobip"
     os.environ["INFOBIP_HOST"] = "localhost"
-    os.environ["INFOBIP_PASSWORD"] = "password"
+    os.environ["INFOBIP_PASSWORD"] = "password" #pragma: allowlist secret
     os.environ["INFOBIP_PORT"] = "8123"
     os.environ["INFOBIP_PROTOCOL"] = "http"
     os.environ["INFOBIP_TABLE"] = "events"
