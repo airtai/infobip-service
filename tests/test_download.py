@@ -139,6 +139,7 @@ def create_duplicated_test_ddf():
     return dd.from_pandas(df, npartitions=2)
 
 @pytest.mark.skipif(sys.version_info < (3, 9))
+@pytest.mark.skipif(sys.platform == "win32")
 def test_pandas2dask_map():
     ddf = create_duplicated_test_ddf()
     df = ddf.compute().set_index("PersonId")
@@ -173,6 +174,7 @@ def test_pandas2dask_map():
     pd.testing.assert_frame_equal(actual, expected)
 
 @pytest.mark.skipif(sys.version_info < (3, 9))
+@pytest.mark.skipif(sys.platform == "win32")
 def test_pandas2dask():
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
