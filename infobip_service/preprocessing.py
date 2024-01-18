@@ -253,22 +253,31 @@ if __name__ == "__main__":
     cluster = LocalCluster()  # type: ignore
     client = Client(cluster)  # type: ignore
 
+    print(client)
+
     try:
         # Read raw data
+        print("Reading raw data...")
         raw_data = dd.read_parquet(raw_data_path)  # type: ignore
+        print("Raw data read.")
 
         # Calculate time threshold
+        print("Calculating time threshold...")
         time_stats = raw_data["OccurredTime"].describe().compute()
         max_time = datetime.strptime(time_stats["max"], "%Y-%m-%d %H:%M:%S.%f")
         time_treshold = max_time - timedelta(days=28)
+        print("Time threshold calculated.")
 
         # Time thresholding
+        print("Time thresholding...")
         time_cutoff_data = sample_time_map(raw_data, time_treshold=time_treshold)
         time_cutoff_data = write_and_read_parquet(
             time_cutoff_data, path=processed_data_path / "time_cutoff_data.parquet"
         )
+        print("Time thresholding done.")
 
         # Remove users without history
+        print("Removing users without history...")
         data_before_horizon = remove_without_history(
             time_cutoff_data, time_treshold=time_treshold - timedelta(days=28)
         )
@@ -276,17 +285,23 @@ if __name__ == "__main__":
             data_before_horizon,
             path=processed_data_path / "data_before_horizon.parquet",
         )
+        print("Users without history removed.")
 
         # Train/test split
+        print("Splitting data...")
         train_raw, validation_raw = split_data(data_before_horizon, split_ratio=0.8)
         train_raw = write_and_read_parquet(
-            train_raw, path=processed_data_path / "train_raw.parquet"
+            train_raw.repartition(partition_size="10MB"),
+            path=processed_data_path / "train_raw.parquet",
         )
         validation_raw = write_and_read_parquet(
-            validation_raw, path=processed_data_path / "validation_raw.parquet"
+            validation_raw.repartition(partition_size="10MB"),
+            path=processed_data_path / "validation_raw.parquet",
         )
+        print("Data split to train/validation.")
 
         # Prepare data
+        print("Preparing data...")
         train_prepared = write_and_read_parquet(
             prepare_ddf(train_raw, history_size=64),
             path=processed_data_path / "train_prepared.parquet",
@@ -295,6 +310,7 @@ if __name__ == "__main__":
             prepare_ddf(validation_raw, history_size=64),
             path=processed_data_path / "validation_prepared.parquet",
         )
+        print("Data prepared.")
     finally:
         client.close()  # type: ignore
         cluster.close()  # type: ignore
