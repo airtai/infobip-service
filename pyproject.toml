@@ -41,6 +41,7 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
+    "faststream==0.3.13",
 ]
 
 [project.optional-dependencies]
