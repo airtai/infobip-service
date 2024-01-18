@@ -98,7 +98,7 @@ dev = [
     "sqlalchemy>=2.0.25",
     "clickhouse-sqlalchemy>=0.3.0",
     "pyarrow>=14.0.2",
-    "matplotlib>=3.8.0",
+    "matplotlib>=3.7.0",
 ]
 
 [project.urls]
