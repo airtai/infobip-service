@@ -333,8 +333,7 @@ def sample_test_histories(
     history_size: int,
 ) -> pd.DataFrame:
     filtered_index = user_histories[
-        (user_histories["OccurredTime"] < horizon_time)
-        & (user_histories["OccurredTime"] > horizon_time - timedelta(days=28))
+        user_histories["OccurredTime"] < horizon_time
     ].index.unique()
 
     user_histories_sample = None
@@ -377,7 +376,7 @@ def prepare_test_data(
     )
 
     sampled_data = ddf.map_partitions(
-        sample_user_histories,
+        sample_test_histories,
         horizon_time=horizon_time,
         history_size=history_size,
         meta=meta,
@@ -400,7 +399,9 @@ def preprocess_test(raw_data_path: Path, processed_data_path: Path) -> dd.DataFr
 
     print("Removing users without history...")
     data_before_horizon = remove_without_history(
-        raw_data, time_treshold=max_time, latest_event_delta=timedelta(days=28)
+        raw_data,
+        time_treshold=max_time - timedelta(days=28),
+        latest_event_delta=timedelta(days=28),
     )
     data_before_horizon = write_and_read_parquet(
         data_before_horizon,
