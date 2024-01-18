@@ -318,8 +318,8 @@ def sample_test_histories(
     history_size: int,
 ) -> pd.DataFrame:
     filtered_index = user_histories[
-        user_histories["OccurredTime"] < horizon_time
-        and user_histories["OccurredTime"] > horizon_time - timedelta(days=28)
+        (user_histories["OccurredTime"] < horizon_time)
+        & (user_histories["OccurredTime"] > horizon_time - timedelta(days=28))
     ].index.unique()
 
     user_histories_sample = None
