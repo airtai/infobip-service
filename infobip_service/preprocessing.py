@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from pathlib import Path
 from random import choice, randrange
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 import dask.dataframe as dd
 import numpy as np
@@ -36,9 +36,18 @@ def sample_time_map(ddf: dd.DataFrame, *, time_treshold: datetime) -> dd.DataFra
 
 
 def _remove_without_history(
-    df: pd.DataFrame, *, time_treshold: datetime
+    df: pd.DataFrame,
+    *,
+    time_treshold: datetime,
+    latest_event_delta: Optional[timedelta] = None,
 ) -> pd.DataFrame:
-    indexes_with_history = df[df["OccurredTime"] < time_treshold].index
+    if latest_event_delta is not None:
+        indexes_with_history = df[
+            (df["OccurredTime"] < time_treshold)
+            & (df["OccurredTime"] > time_treshold - latest_event_delta)
+        ].index
+    else:
+        indexes_with_history = df[df["OccurredTime"] < time_treshold].index
     return df[df.index.isin(indexes_with_history)]
 
 
@@ -46,10 +55,16 @@ def remove_without_history(
     ddf: dd.DataFrame,  # type: ignore
     *,
     time_treshold: datetime,
+    latest_event_delta: Optional[timedelta] = None,
 ) -> dd.DataFrame:  # type: ignore
-    meta = _remove_without_history(ddf._meta, time_treshold=time_treshold)
+    meta = _remove_without_history(
+        ddf._meta, time_treshold=time_treshold, latest_event_delta=latest_event_delta
+    )
     return ddf.map_partitions(
-        _remove_without_history, time_treshold=time_treshold, meta=meta
+        _remove_without_history,
+        time_treshold=time_treshold,
+        meta=meta,
+        latest_event_delta=latest_event_delta,
     )
 
 
@@ -385,7 +400,7 @@ def preprocess_test(raw_data_path: Path, processed_data_path: Path) -> dd.DataFr
 
     print("Removing users without history...")
     data_before_horizon = remove_without_history(
-        raw_data, time_treshold=max_time - timedelta(days=28)
+        raw_data, time_treshold=max_time, latest_event_delta=timedelta(days=28)
     )
     data_before_horizon = write_and_read_parquet(
         data_before_horizon,
