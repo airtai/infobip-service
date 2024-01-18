@@ -6,6 +6,9 @@ from typing import Any, Tuple
 import dask.dataframe as dd
 import numpy as np
 import pandas as pd
+from dask.distributed import Client, LocalCluster
+
+from infobip_service.download import raw_data_path
 
 processed_data_path = Path() / ".." / "data" / "processed"
 
@@ -244,3 +247,54 @@ def prepare_ddf(ddf: dd.DataFrame, *, history_size: int) -> dd.DataFrame:  # typ
     )
 
     return sampled_data
+
+
+if __name__ == "__main__":
+    cluster = LocalCluster()  # type: ignore
+    client = Client(cluster)  # type: ignore
+
+    try:
+        # Read raw data
+        raw_data = dd.read_parquet(raw_data_path)  # type: ignore
+
+        # Calculate time threshold
+        time_stats = raw_data["OccurredTime"].describe().compute()
+        max_time = datetime.strptime(time_stats["max"], "%Y-%m-%d %H:%M:%S.%f")
+        time_treshold = max_time - timedelta(days=28)
+
+        # Time thresholding
+        time_cutoff_data = sample_time_map(raw_data, time_treshold=time_treshold)
+        time_cutoff_data = write_and_read_parquet(
+            time_cutoff_data, path=processed_data_path / "time_cutoff_data.parquet"
+        )
+
+        # Remove users without history
+        data_before_horizon = remove_without_history(
+            time_cutoff_data, time_treshold=time_treshold - timedelta(days=28)
+        )
+        data_before_horizon = write_and_read_parquet(
+            data_before_horizon,
+            path=processed_data_path / "data_before_horizon.parquet",
+        )
+
+        # Train/test split
+        train_raw, validation_raw = split_data(data_before_horizon, split_ratio=0.8)
+        train_raw = write_and_read_parquet(
+            train_raw, path=processed_data_path / "train_raw.parquet"
+        )
+        validation_raw = write_and_read_parquet(
+            validation_raw, path=processed_data_path / "validation_raw.parquet"
+        )
+
+        # Prepare data
+        train_prepared = write_and_read_parquet(
+            prepare_ddf(train_raw, history_size=64),
+            path=processed_data_path / "train_prepared.parquet",
+        )
+        validation_prepared = write_and_read_parquet(
+            prepare_ddf(validation_raw, history_size=64),
+            path=processed_data_path / "validation_prepared.parquet",
+        )
+    finally:
+        client.close()  # type: ignore
+        cluster.close()  # type: ignore
