@@ -249,6 +249,166 @@ def prepare_ddf(ddf: dd.DataFrame, *, history_size: int) -> dd.DataFrame:  # typ
     return sampled_data
 
 
+def preprocess_train_validation(
+    raw_data_path: Path, preprocessed_data_path: Path
+) -> Tuple[dd.DataFrame, dd.DataFrame]:  # type: ignore
+    # Read raw data
+    print("Reading raw data...")
+    raw_data = dd.read_parquet(raw_data_path)  # type: ignore
+    print("Raw data read.")
+
+    # Calculate time threshold
+    print("Calculating time threshold...")
+    time_stats = raw_data["OccurredTime"].describe().compute()
+    max_time = datetime.strptime(time_stats["max"], "%Y-%m-%d %H:%M:%S.%f")
+    time_treshold = max_time - timedelta(days=28)
+    print("Time threshold calculated.")
+
+    # Time thresholding
+    print("Time thresholding...")
+    time_cutoff_data = sample_time_map(raw_data, time_treshold=time_treshold)
+    time_cutoff_data = write_and_read_parquet(
+        time_cutoff_data, path=processed_data_path / "time_cutoff_data.parquet"
+    )
+    print("Time thresholding done.")
+
+    # Remove users without history
+    print("Removing users without history...")
+    data_before_horizon = remove_without_history(
+        time_cutoff_data, time_treshold=time_treshold - timedelta(days=28)
+    )
+    data_before_horizon = write_and_read_parquet(
+        data_before_horizon,
+        path=processed_data_path / "data_before_horizon.parquet",
+    )
+    print("Users without history removed.")
+
+    # Train/test split
+    print("Splitting data...")
+    train_raw, validation_raw = split_data(data_before_horizon, split_ratio=0.8)
+    train_raw = write_and_read_parquet(
+        train_raw.repartition(partition_size="10MB"),
+        path=processed_data_path / "train_raw.parquet",
+    )
+    validation_raw = write_and_read_parquet(
+        validation_raw.repartition(partition_size="10MB"),
+        path=processed_data_path / "validation_raw.parquet",
+    )
+    print("Data split to train/validation.")
+
+    # Prepare data
+    print("Preparing data...")
+    train_prepared = write_and_read_parquet(
+        prepare_ddf(train_raw, history_size=64),
+        path=processed_data_path / "train_prepared.parquet",
+    )
+    validation_prepared = write_and_read_parquet(
+        prepare_ddf(validation_raw, history_size=64),
+        path=processed_data_path / "validation_prepared.parquet",
+    )
+    print("Data prepared.")
+
+    return train_prepared, validation_prepared
+
+
+def sample_test_histories(
+    user_histories: pd.DataFrame,
+    *,
+    horizon_time: datetime,
+    history_size: int,
+) -> pd.DataFrame:
+    filtered_index = user_histories[
+        user_histories["OccurredTime"] < horizon_time
+        and user_histories["OccurredTime"] > horizon_time - timedelta(days=28)
+    ].index.unique()
+
+    user_histories_sample = None
+
+    for index in filtered_index:
+        chosen_user_history = user_histories[
+            user_histories.index.isin([index])  # nosec
+        ]
+        next_event_timedelta = get_next_event(chosen_user_history, t0=horizon_time)
+        reconstructed_history = create_user_histories(
+            chosen_user_history, t0=horizon_time, history_size=history_size
+        )
+        reconstructed_history = pd.merge(
+            reconstructed_history,
+            next_event_timedelta,
+            left_index=True,
+            right_index=True,
+        )
+
+        if user_histories_sample is None:
+            user_histories_sample = reconstructed_history
+        else:
+            user_histories_sample = pd.concat(
+                [user_histories_sample, reconstructed_history]
+            )
+
+    return user_histories_sample
+
+
+def prepare_test_data(
+    ddf: dd.DataFrame,  # type: ignore
+    *,
+    horizon_time: datetime,
+    history_size: int,
+) -> pd.DataFrame:  # type: ignore
+    meta = sample_test_histories(
+        ddf.head(2, npartitions=-1),
+        horizon_time=horizon_time,
+        history_size=history_size,
+    )
+
+    sampled_data = ddf.map_partitions(
+        sample_user_histories,
+        horizon_time=horizon_time,
+        history_size=history_size,
+        meta=meta,
+    )
+
+    return sampled_data
+
+
+def preprocess_test(raw_data_path: Path, processed_data_path: Path) -> dd.DataFrame:  # type: ignore
+    # Read raw data
+    print("Reading raw data...")
+    raw_data = dd.read_parquet(raw_data_path)  # type: ignore
+    print("Raw data read.")
+
+    # Calculate time threshold
+    print("Calculating max time...")
+    time_stats = raw_data["OccurredTime"].describe().compute()
+    max_time = datetime.strptime(time_stats["max"], "%Y-%m-%d %H:%M:%S.%f")
+    print("Max time calculated.")
+
+    print("Removing users without history...")
+    data_before_horizon = remove_without_history(
+        raw_data, time_treshold=max_time - timedelta(days=28)
+    )
+    data_before_horizon = write_and_read_parquet(
+        data_before_horizon,
+        path=processed_data_path / "test_data_before_horizon.parquet",
+    )
+    print("Users without history removed.")
+
+    # Prepare data
+    print("Preparing data...")
+    data_prepared = prepare_test_data(
+        data_before_horizon.repartition(partition_size="5MB"),
+        history_size=64,
+        horizon_time=max_time - timedelta(days=28),
+    )
+    data_prepared = write_and_read_parquet(
+        data_prepared,
+        path=processed_data_path / "test_prepared.parquet",
+    )
+    print("Data prepared.")
+
+    return data_prepared
+
+
 if __name__ == "__main__":
     cluster = LocalCluster()  # type: ignore
     client = Client(cluster)  # type: ignore
@@ -256,61 +416,8 @@ if __name__ == "__main__":
     print(client)
 
     try:
-        # Read raw data
-        print("Reading raw data...")
-        raw_data = dd.read_parquet(raw_data_path)  # type: ignore
-        print("Raw data read.")
-
-        # Calculate time threshold
-        print("Calculating time threshold...")
-        time_stats = raw_data["OccurredTime"].describe().compute()
-        max_time = datetime.strptime(time_stats["max"], "%Y-%m-%d %H:%M:%S.%f")
-        time_treshold = max_time - timedelta(days=28)
-        print("Time threshold calculated.")
-
-        # Time thresholding
-        print("Time thresholding...")
-        time_cutoff_data = sample_time_map(raw_data, time_treshold=time_treshold)
-        time_cutoff_data = write_and_read_parquet(
-            time_cutoff_data, path=processed_data_path / "time_cutoff_data.parquet"
-        )
-        print("Time thresholding done.")
-
-        # Remove users without history
-        print("Removing users without history...")
-        data_before_horizon = remove_without_history(
-            time_cutoff_data, time_treshold=time_treshold - timedelta(days=28)
-        )
-        data_before_horizon = write_and_read_parquet(
-            data_before_horizon,
-            path=processed_data_path / "data_before_horizon.parquet",
-        )
-        print("Users without history removed.")
-
-        # Train/test split
-        print("Splitting data...")
-        train_raw, validation_raw = split_data(data_before_horizon, split_ratio=0.8)
-        train_raw = write_and_read_parquet(
-            train_raw.repartition(partition_size="10MB"),
-            path=processed_data_path / "train_raw.parquet",
-        )
-        validation_raw = write_and_read_parquet(
-            validation_raw.repartition(partition_size="10MB"),
-            path=processed_data_path / "validation_raw.parquet",
-        )
-        print("Data split to train/validation.")
-
-        # Prepare data
-        print("Preparing data...")
-        train_prepared = write_and_read_parquet(
-            prepare_ddf(train_raw, history_size=64),
-            path=processed_data_path / "train_prepared.parquet",
-        )
-        validation_prepared = write_and_read_parquet(
-            prepare_ddf(validation_raw, history_size=64),
-            path=processed_data_path / "validation_prepared.parquet",
-        )
-        print("Data prepared.")
+        preprocess_test(raw_data_path, processed_data_path)
+        preprocess_train_validation(raw_data_path, processed_data_path)
     finally:
         client.close()  # type: ignore
         cluster.close()  # type: ignore
