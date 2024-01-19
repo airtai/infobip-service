@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from pathlib import Path
 from random import choice, randrange
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, Union
 
 import dask.dataframe as dd
 import numpy as np
@@ -167,7 +167,9 @@ def random_date(start: datetime, end: datetime) -> datetime:
     return start + timedelta(seconds=random_second)
 
 
-def convert_datetime(time: str) -> datetime:
+def convert_datetime(time: Union[str, pd.Timestamp]) -> datetime:
+    if isinstance(time, pd.Timestamp):
+        return time.to_pydatetime()  # type: ignore
     try:
         return datetime.strptime(time, "%Y-%m-%d %H:%M:%S")
     except ValueError:
