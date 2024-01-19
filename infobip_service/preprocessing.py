@@ -118,7 +118,7 @@ def pad_left(
     array_to_pad: np.ndarray,  # type: ignore
     *,
     size: int,
-) -> np.ndarray[Any, np.dtype[Any]]:
+) -> np.ndarray:  # type: ignore
     return np.pad(array_to_pad, pad_width=(size - len(array_to_pad), 0), mode="empty")
 
 
