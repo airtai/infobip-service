@@ -69,12 +69,12 @@ async def on_training_model_start(msg: TrainingModelStart) -> None:
 
         dt = datetime.now().date().isoformat()
         path = (
-            root_path
+            root_path   # type: ignore [operator]
             / f"AccountId-{AccountId}"
             / f"ApplicationId-{ApplicationId}"
             / f"ModelId-{ModelId}"
             / dt
-        )  # type: ignore [operator]
+        )
 
         training_model_status = TrainingModelStatus(
             AccountId=AccountId,
