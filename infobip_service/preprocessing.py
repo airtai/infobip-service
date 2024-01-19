@@ -115,7 +115,9 @@ def get_next_event(df: pd.DataFrame, *, t0: datetime) -> pd.DataFrame:
 
 
 def pad_left(
-    array_to_pad: np.ndarray[Any, np.dtype[Any]], *, size: int
+    array_to_pad: np.ndarray,  # type: ignore
+    *,
+    size: int,
 ) -> np.ndarray[Any, np.dtype[Any]]:
     return np.pad(array_to_pad, pad_width=(size - len(array_to_pad), 0), mode="empty")
 
