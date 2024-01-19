@@ -4,9 +4,16 @@ on:
   push:
    branches:
      - main
+     - dev
   pull_request:
     types: [opened, synchronize]
   merge_group:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PROD_CONFIG: ${{ secrets.PROD_CONFIG }}
+  STAGING_CONFIG: ${{ secrets.STAGING_CONFIG }}
 
 jobs:
   static_analysis:
@@ -162,3 +169,39 @@ jobs:
         uses: re-actors/alls-green@release/v1 # nosemgrep
         with:
           jobs: ${{ toJSON(needs) }}
+
+  docker_build_push:
+    runs-on: ubuntu-22.04
+    needs: [check]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master # nosemgrep: yaml.github-actions.security.third-party-action-not-pinned-to-commit-sha.third-party-action-not-pinned-to-commit-sha
+        with:
+          overprovision-lvm: 'true'
+          # root-reserve-mb: 33792
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: wget https://github.com/aquasecurity/trivy/releases/download/v0.18.3/trivy_0.18.3_Linux-64bit.deb
+      - run: sudo dpkg -i trivy_0.18.3_Linux-64bit.deb
+      # - run: docker pull ghcr.io/$GITHUB_REPOSITORY:$GITHUB_REF_NAME || docker pull ghcr.io/$GITHUB_REPOSITORY:dev || true
+      - run: bash ./scripts/build_docker.sh
+      # - run: bash ./scripts/check_docker.sh
+      - name: Push only if branch name is main or dev
+        if: github.ref_name == 'main' || github.ref_name == 'dev'
+        run: docker push ghcr.io/$GITHUB_REPOSITORY --all-tags
