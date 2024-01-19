@@ -2,20 +2,17 @@ import logging
 from datetime import datetime, timedelta
 from time import sleep
 
-import pytest
 from pydantic import BaseModel
-from faststream import FastStream
-from faststream.kafka import KafkaBroker, TestKafkaBroker
 
 from infobip_service.kafka_server import (
     EventData,
     LogMessage,
     ModelTrainingRequest,
+    Tracker,
     TrainingDataStatus,
     TrainingModelStart,
+    TrainingModelStatus,
     get_key,
-    Tracker,
-    TrainingModelStatus
 )
 
 
@@ -44,9 +41,6 @@ def test_log_message():
     assert datetime.now() - msg.timestamp < timedelta(seconds=1), (
         datetime.now() - msg.timestamp
     )
-
-
-
 
 
 def test_model_training_request():
@@ -149,6 +143,7 @@ def test_tracker_1():
 
     assert tracker.finished()
 
+
 def test_tracker_2():
     tracker = Tracker(limit=10, timeout=1, abort_after=10)
 
@@ -161,6 +156,7 @@ def test_tracker_2():
     sleep(1.1)
 
     assert tracker.finished()
+
 
 def test_tracker_3():
     tracker = Tracker(limit=10, timeout=1, abort_after=2)

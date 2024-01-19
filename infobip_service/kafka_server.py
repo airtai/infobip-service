@@ -35,7 +35,6 @@ class LogMessage(BaseModel):
         return timestamp.strftime("%Y-%m-%dT%H:%M:%S")
 
 
-
 class TaskType(str, Enum):
     """TaskType is an enumeration of supported model types."""
 
@@ -162,6 +161,7 @@ class TrainingDataStatus(BaseModel):
 
 class TrainingModelStart(BaseModel):
     """Request to start training a model."""
+
     AccountId: NonNegativeInt = Field(
         ..., examples=[202020], description="ID of an account"
     )
@@ -198,6 +198,7 @@ def get_key(msg: BaseModel, attrs: Optional[List[str]] = None) -> bytes:
 
 class Tracker:
     """Tracks the progress of the training data ingestion."""
+
     def __init__(self, *, limit: int, timeout: int, abort_after: int):
         """Initializes the tracker."""
         self._limit = limit
@@ -231,6 +232,7 @@ class Tracker:
 
 class TrainingModelStatus(BaseModel):
     """Status of the training model."""
+
     AccountId: NonNegativeInt = Field(
         ..., examples=[202020], description="ID of an account"
     )

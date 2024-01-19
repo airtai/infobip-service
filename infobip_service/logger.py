@@ -86,9 +86,7 @@ def get_default_logger_configuration(level: int = logging.INFO) -> Dict[str, Any
 logger_spaces_added: List[str] = []
 
 
-def get_logger(
-    name: str, *, level: int = logging.INFO
-) -> logging.Logger:
+def get_logger(name: str, *, level: int = logging.INFO) -> logging.Logger:
     """Return the logger class with default logging configuration.
 
     Args:

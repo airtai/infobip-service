@@ -17,12 +17,14 @@ logger = get_logger(__name__)
 
 group_id = environ.get("DOWNLOADING_GROUP_ID", None)
 if group_id is None:
-    group_id = f"infobip-downloader-{random.randint(100_000_000, 999_999_999):0,d}".replace(  # nosec: B311:blacklist
-        ",", "-"
+    group_id = (
+        f"infobip-downloader-{random.randint(100_000_000, 999_999_999):0,d}".replace(  # nosec: B311:blacklist
+            ",", "-"
+        )
     )
 logger.info(f"{group_id=}")
 
-root_path = Path(environ.get("ROOT_PATH")) if environ.get("ROOT_PATH") else None # type: ignore [arg-type]
+root_path = Path(environ.get("ROOT_PATH")) if environ.get("ROOT_PATH") else None  # type: ignore [arg-type]
 if root_path is None:
     root_path = Path() / group_id
 
@@ -41,11 +43,12 @@ if with_security:
         username=environ["KAFKA_API_KEY"],
         password=environ["KAFKA_API_SECRET"],
     )
-    kwargs["security"] = security # type: ignore [assignment]
+    kwargs["security"] = security  # type: ignore [assignment]
 
-broker = KafkaBroker(f"{environ['KAFKA_HOSTNAME']}:{environ['KAFKA_PORT']}", **kwargs) # type: ignore [arg-type]
+broker = KafkaBroker(f"{environ['KAFKA_HOSTNAME']}:{environ['KAFKA_PORT']}", **kwargs)  # type: ignore [arg-type]
 
 username = environ.get("USERNAME", "infobip")
+
 
 @broker.publisher(f"{username}_training_model_status")
 async def to_training_model_status(
@@ -56,19 +59,22 @@ async def to_training_model_status(
 
 
 @broker.subscriber(f"{username}_training_model_start", auto_offset_reset="earliest")
-async def on_training_model_start(
-    msg: TrainingModelStart
-) -> None:
+async def on_training_model_start(msg: TrainingModelStart) -> None:
     try:
         logger.info(f"on_training_model_start({msg}) started")
 
-        AccountId = msg.AccountId # noqa: N806
-        ApplicationId = msg.ApplicationId # noqa: N806
-        ModelId = msg.ModelId# noqa: N806
+        AccountId = msg.AccountId  # noqa: N806
+        ApplicationId = msg.ApplicationId  # noqa: N806
+        ModelId = msg.ModelId  # noqa: N806
 
         dt = datetime.now().date().isoformat()
-        path = root_path / f"AccountId-{AccountId}" / f"ApplicationId-{ApplicationId}" / f"ModelId-{ModelId}" / dt # type: ignore [operator]
-
+        path = (
+            root_path
+            / f"AccountId-{AccountId}"
+            / f"ApplicationId-{ApplicationId}"
+            / f"ModelId-{ModelId}"
+            / dt
+        )  # type: ignore [operator]
 
         training_model_status = TrainingModelStatus(
             AccountId=AccountId,
@@ -89,7 +95,9 @@ async def on_training_model_start(
 
             path.mkdir(parents=True, exist_ok=True)
 
-            logger.info(f"on_training_model_start({msg}): downloading data to '{path}'...")
+            logger.info(
+                f"on_training_model_start({msg}): downloading data to '{path}'..."
+            )
             # with using_cluster("cpu"):
             download_account_id_rows_as_parquet(
                 account_id=AccountId,
@@ -97,7 +105,9 @@ async def on_training_model_start(
                 output_path=path,
             )
 
-            logger.info(f"on_training_model_start({msg}): data downloaded to '{path}'...")
+            logger.info(
+                f"on_training_model_start({msg}): data downloaded to '{path}'..."
+            )
 
         training_model_status = TrainingModelStatus(
             AccountId=AccountId,
@@ -111,7 +121,6 @@ async def on_training_model_start(
 
     finally:
         logger.info(f"on_training_model_start({msg}) finished.")
-
 
 
 app = FastStream(broker=broker)
