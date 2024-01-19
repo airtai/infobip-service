@@ -16,7 +16,7 @@ RUN apt update --fix-missing && apt upgrade --yes \
     && apt purge --auto-remove --yes && apt clean && rm -rf /var/lib/apt/lists/*
 
 COPY infobip_service infobip_service
-COPY pyproject.toml scripts/start_service.sh ./
+COPY pyproject.toml scripts/start_service.sh README.md ./
 
 # Install requirements
 RUN pip install -e ".[dev]"
