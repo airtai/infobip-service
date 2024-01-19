@@ -270,27 +270,27 @@ def preprocess_train_validation(
     raw_data_path: Path, preprocessed_data_path: Path
 ) -> Tuple[dd.DataFrame, dd.DataFrame]:  # type: ignore
     # Read raw data
-    print("Reading raw data...")
+    print("Reading raw data...")  # noqa: T201
     raw_data = dd.read_parquet(raw_data_path)  # type: ignore
-    print("Raw data read.")
+    print("Raw data read.")  # noqa: T201
 
     # Calculate time threshold
-    print("Calculating time threshold...")
+    print("Calculating time threshold...")  # noqa: T201
     time_stats = raw_data["OccurredTime"].describe().compute()
     max_time = datetime.strptime(time_stats["max"], "%Y-%m-%d %H:%M:%S.%f")
     time_treshold = max_time - timedelta(days=28)
-    print("Time threshold calculated.")
+    print("Time threshold calculated.")  # noqa: T201
 
     # Time thresholding
-    print("Time thresholding...")
+    print("Time thresholding...")  # noqa: T201
     time_cutoff_data = sample_time_map(raw_data, time_treshold=time_treshold)
     time_cutoff_data = write_and_read_parquet(
         time_cutoff_data, path=processed_data_path / "time_cutoff_data.parquet"
     )
-    print("Time thresholding done.")
+    print("Time thresholding done.")  # noqa: T201
 
     # Remove users without history
-    print("Removing users without history...")
+    print("Removing users without history...")  # noqa: T201
     data_before_horizon = remove_without_history(
         time_cutoff_data, time_treshold=time_treshold - timedelta(days=28)
     )
@@ -298,10 +298,10 @@ def preprocess_train_validation(
         data_before_horizon,
         path=processed_data_path / "data_before_horizon.parquet",
     )
-    print("Users without history removed.")
+    print("Users without history removed.")  # noqa: T201
 
     # Train/test split
-    print("Splitting data...")
+    print("Splitting data...")  # noqa: T201
     train_raw, validation_raw = split_data(data_before_horizon, split_ratio=0.8)
     train_raw = write_and_read_parquet(
         train_raw.repartition(partition_size="10MB"),
@@ -311,10 +311,10 @@ def preprocess_train_validation(
         validation_raw.repartition(partition_size="10MB"),
         path=processed_data_path / "validation_raw.parquet",
     )
-    print("Data split to train/validation.")
+    print("Data split to train/validation.")  # noqa: T201
 
     # Prepare data
-    print("Preparing data...")
+    print("Preparing data...")  # noqa: T201
     train_prepared = write_and_read_parquet(
         prepare_ddf(train_raw, history_size=64),
         path=processed_data_path / "train_prepared.parquet",
@@ -323,7 +323,7 @@ def preprocess_train_validation(
         prepare_ddf(validation_raw, history_size=64),
         path=processed_data_path / "validation_prepared.parquet",
     )
-    print("Data prepared.")
+    print("Data prepared.")  # noqa: T201
 
     return train_prepared, validation_prepared
 
@@ -389,17 +389,17 @@ def prepare_test_data(
 
 def preprocess_test(raw_data_path: Path, processed_data_path: Path) -> dd.DataFrame:  # type: ignore
     # Read raw data
-    print("Reading raw data...")
+    print("Reading raw data...")  # noqa: T201
     raw_data = dd.read_parquet(raw_data_path)  # type: ignore
-    print("Raw data read.")
+    print("Raw data read.")  # noqa: T201
 
     # Calculate time threshold
-    print("Calculating max time...")
+    print("Calculating max time...")  # noqa: T201
     time_stats = raw_data["OccurredTime"].describe().compute()
     max_time = datetime.strptime(time_stats["max"], "%Y-%m-%d %H:%M:%S.%f")
-    print("Max time calculated.")
+    print("Max time calculated.")  # noqa: T201
 
-    print("Removing users without history...")
+    print("Removing users without history...")  # noqa: T201
     data_before_horizon = remove_without_history(
         raw_data,
         time_treshold=max_time - timedelta(days=28),
@@ -409,10 +409,10 @@ def preprocess_test(raw_data_path: Path, processed_data_path: Path) -> dd.DataFr
         data_before_horizon,
         path=processed_data_path / "test_data_before_horizon.parquet",
     )
-    print("Users without history removed.")
+    print("Users without history removed.")  # noqa: T201
 
     # Prepare data
-    print("Preparing data...")
+    print("Preparing data...")  # noqa: T201
     data_prepared = prepare_test_data(
         data_before_horizon.repartition(partition_size="5MB"),
         history_size=64,
@@ -422,7 +422,7 @@ def preprocess_test(raw_data_path: Path, processed_data_path: Path) -> dd.DataFr
         data_prepared,
         path=processed_data_path / "test_prepared.parquet",
     )
-    print("Data prepared.")
+    print("Data prepared.")  # noqa: T201
 
     return data_prepared
 
@@ -431,7 +431,7 @@ if __name__ == "__main__":
     cluster = LocalCluster()  # type: ignore
     client = Client(cluster)  # type: ignore
 
-    print(client)
+    print(client)  # noqa: T201
 
     try:
         preprocess_test(raw_data_path, processed_data_path)
