@@ -12,14 +12,10 @@ __all__ = [
 # Cell
 
 import logging
-from typing import *
 
 # Internal Cell
-
 import logging.config
-import traceback
-from contextlib import contextmanager, redirect_stderr, redirect_stdout
-from io import StringIO
+from typing import Dict, List
 
 # Cell
 
@@ -35,7 +31,7 @@ should_supress_timestamps: bool = False
 
 
 def supress_timestamps(flag: bool = True):
-    """Supress logger timestamp
+    """Supress logger timestamp.
 
     Args:
         flag: If not set, then the default value **True** will be used to supress the timestamp
@@ -46,7 +42,7 @@ def supress_timestamps(flag: bool = True):
 
 
 def get_default_logger_configuration(level: int = logging.INFO) -> Dict:
-    """Return the common configurations for the logger
+    """Return the common configurations for the logger.
 
     Args:
         level: Logger level to set
@@ -58,17 +54,17 @@ def get_default_logger_configuration(level: int = logging.INFO) -> Dict:
     global should_supress_timestamps
 
     if should_supress_timestamps:
-        FORMAT = "[%(levelname)s] %(name)s: %(message)s"
+        format = "[%(levelname)s] %(name)s: %(message)s"
     else:
-        FORMAT = "%(asctime)s.%(msecs)03d [%(levelname)s] %(name)s: %(message)s"
+        format = "%(asctime)s.%(msecs)03d [%(levelname)s] %(name)s: %(message)s"
 
-    DATE_FMT = "%y-%m-%d %H:%M:%S"
+    date_fmt = "%y-%m-%d %H:%M:%S"
 
-    LOGGING_CONFIG = {
+    logging_config = {
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
-            "standard": {"format": FORMAT, "datefmt": DATE_FMT},
+            "standard": {"format": format, "datefmt": date_fmt},
         },
         "handlers": {
             "default": {
@@ -82,7 +78,7 @@ def get_default_logger_configuration(level: int = logging.INFO) -> Dict:
             "": {"handlers": ["default"], "level": level},  # root logger
         },
     }
-    return LOGGING_CONFIG
+    return logging_config
 
 
 # Cell
@@ -91,7 +87,7 @@ logger_spaces_added: List[str] = []
 
 
 def get_logger(
-    name: str, *, level: int = logging.INFO, add_spaces: bool = True
+    name: str, *, level: int = logging.INFO
 ) -> logging.Logger:
     """Return the logger class with default logging configuration.
 
@@ -99,7 +95,6 @@ def get_logger(
         name: Pass the __name__ variable as name while calling
         level: Used to configure logging, default value `logging.INFO` logs
             info messages and up.
-        add_spaces:
 
     Returns:
         The logging.Logger class with default/custom logging configuration
@@ -109,23 +104,6 @@ def get_logger(
     logging.config.dictConfig(config)
 
     logger = logging.getLogger(name)
-    #     stack_size = len(traceback.extract_stack())
-    #     def add_spaces_f(f):
-    #         def f_with_spaces(msg, *args, **kwargs):
-    #             cur_stack_size = len(traceback.extract_stack())
-    #             msg = " "*(cur_stack_size-stack_size)*2 + msg
-    #             return f(msg, *args, **kwargs)
-    #         return f_with_spaces
-
-    #     if name not in logger_spaces_added and add_spaces:
-    #         logger.debug = add_spaces_f(logger.debug) # type: ignore
-    #         logger.info = add_spaces_f(logger.info) # type: ignore
-    #         logger.warning = add_spaces_f(logger.warning) # type: ignore
-    #         logger.error = add_spaces_f(logger.error) # type: ignore
-    #         logger.critical = add_spaces_f(logger.critical) # type: ignore
-    #         logger.exception = add_spaces_f(logger.exception) # type: ignore
-
-    #         logger_spaces_added.append(name)
 
     return logger
 
@@ -134,12 +112,11 @@ def get_logger(
 
 
 def set_level(level: int):
-    """Set logger level
+    """Set logger level.
 
     Args:
         level: Logger level to set
     """
-
     # Getting all loggers that has either airt or __main__ in the name
     loggers = [
         logging.getLogger(name)

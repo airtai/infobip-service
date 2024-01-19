@@ -1,11 +1,8 @@
-import asyncio
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import List, Optional, Union, Callable, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, NonNegativeInt, SerializeAsAny, field_serializer
-from faststream import FastStream
-from faststream.kafka import KafkaBroker
 
 from infobip_service.logger import get_logger, supress_timestamps
 
@@ -200,7 +197,9 @@ def get_key(msg: BaseModel, attrs: Optional[List[str]] = None) -> bytes:
 
 
 class Tracker:
+    """Tracks the progress of the training data ingestion."""
     def __init__(self, *, limit: int, timeout: int, abort_after: int):
+        """Initializes the tracker."""
         self._limit = limit
         self._timeout = timeout
         self._abort_after = abort_after
@@ -231,6 +230,7 @@ class Tracker:
 
 
 class TrainingModelStatus(BaseModel):
+    """Status of the training model."""
     AccountId: NonNegativeInt = Field(
         ..., examples=[202020], description="ID of an account"
     )

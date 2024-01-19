@@ -1,36 +1,37 @@
+import random
+import ssl
+from datetime import datetime
+from os import environ
 from pathlib import Path
-from typing import Optional
+
 from faststream import FastStream
 from faststream.kafka import KafkaBroker
-import random
 from faststream.security import SASLScram256
-import ssl
 
-from os import environ
-
-from datetime import datetime
-
-from infobip_service.kafka_server import TrainingModelStatus, TrainingModelStart
 from infobip_service.download import download_account_id_rows_as_parquet
+from infobip_service.kafka_server import TrainingModelStart, TrainingModelStatus
+from infobip_service.logger import get_logger, supress_timestamps
 
+supress_timestamps(False)
+logger = get_logger(__name__)
 
 group_id = environ.get("DOWNLOADING_GROUP_ID", None)
 if group_id is None:
     group_id = f"infobip-downloader-{random.randint(100_000_000, 999_999_999):0,d}".replace(  # nosec: B311:blacklist
         ",", "-"
     )
-print(f"{group_id=}")
+logger.info(f"{group_id=}")
 
 root_path = Path(environ.get("ROOT_PATH")) if environ.get("ROOT_PATH") else None
 if root_path is None:
-    root_path = Path(".") / group_id
+    root_path = Path() / group_id
 
-kwargs = dict(
-    request_timeout_ms=120_000,
-    max_batch_size=120_000,
-    connections_max_idle_ms=10_000,
+kwargs = {
+    "request_timeout_ms": 120_000,
+    "max_batch_size": 120_000,
+    "connections_max_idle_ms": 10_000,
     # auto_offset_reset="earliest",
-)
+}
 
 with_security = environ.get("WITH_SECURITY", "false").lower() == "true"
 if with_security:
@@ -38,7 +39,7 @@ if with_security:
     security = SASLScram256(
         ssl_context=ssl_context,
         username=environ["KAFKA_API_KEY"],
-        password=environ["KAFKA_API_SECRET"], 
+        password=environ["KAFKA_API_SECRET"],
     )
     kwargs["security"] = security
 
@@ -50,7 +51,7 @@ username = environ.get("USERNAME", "infobip")
 async def to_training_model_status(
     training_model_status: TrainingModelStatus,
 ) -> TrainingModelStatus:
-    print(f"to_training_model_status({training_model_status})")
+    logger.info(f"to_training_model_status({training_model_status})")
     return training_model_status
 
 
@@ -59,17 +60,16 @@ async def on_training_model_start(
     msg: TrainingModelStart
 ) -> None:
     try:
-        print(f"on_training_model_start({msg}) started")
+        logger.info(f"on_training_model_start({msg}) started")
 
-        AccountId = msg.AccountId
-        ApplicationId = msg.ApplicationId
-        ModelId = msg.ModelId
-        task_type = msg.task_type
+        AccountId = msg.AccountId # noqa: N806
+        ApplicationId = msg.ApplicationId # noqa: N806
+        ModelId = msg.ModelId# noqa: N806
 
         dt = datetime.now().date().isoformat()
         path = root_path / f"AccountId-{AccountId}" / f"ApplicationId-{ApplicationId}" / f"ModelId-{ModelId}" / dt
-        
-        
+
+
         training_model_status = TrainingModelStatus(
             AccountId=AccountId,
             ApplicationId=ApplicationId,
@@ -81,7 +81,7 @@ async def on_training_model_start(
         await to_training_model_status(training_model_status)
 
         if path.exists():
-            print(
+            logger.info(
                 f"on_training_model_start({msg}): path '{path}' exists, moving on..."
             )
         else:
@@ -89,7 +89,7 @@ async def on_training_model_start(
 
             path.mkdir(parents=True, exist_ok=True)
 
-            print(f"on_training_model_start({msg}): downloading data to '{path}'...")
+            logger.info(f"on_training_model_start({msg}): downloading data to '{path}'...")
             # with using_cluster("cpu"):
             download_account_id_rows_as_parquet(
                 account_id=AccountId,
@@ -97,7 +97,7 @@ async def on_training_model_start(
                 output_path=path,
             )
 
-            print(f"on_training_model_start({msg}): data downloaded to '{path}'...")
+            logger.info(f"on_training_model_start({msg}): data downloaded to '{path}'...")
 
         training_model_status = TrainingModelStatus(
             AccountId=AccountId,
@@ -110,7 +110,7 @@ async def on_training_model_start(
         await to_training_model_status(training_model_status)
 
     finally:
-        print(f"on_training_model_start({msg}) finished.")
+        logger.info(f"on_training_model_start({msg}) finished.")
 
 
 
