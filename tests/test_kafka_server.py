@@ -126,7 +126,7 @@ def test_get_key():
     assert actual == b"AccountId='12345', ModelId='10001'", actual
 
     actual = get_key(training_model_start, ["task_type"])
-    assert actual == b"task_type='TaskType.churn'", actual
+    assert actual == b"task_type='churn'", actual
 
 
 def test_tracker_1():

@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.10"]
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
@@ -168,3 +168,44 @@ jobs:
       - name: Push only if branch name is main or dev
         if: github.ref_name == 'main' || github.ref_name == 'dev'
         run: docker push ghcr.io/$GITHUB_REPOSITORY --all-tags
+
+  deploy:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+    needs: [docker_build_push]
+    if: github.ref_name == 'main' || github.ref_name == 'dev'
+    container:
+      image: ubuntu:22.04
+    env:
+      GITHUB_USERNAME: ${{ github.actor }}
+      GITHUB_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+      PROD_SSH_PASSWORD: ${{ secrets.PROD_SSH_PASSWORD }}
+      PROD_GPU_DEVICE: ${{ vars.PROD_GPU_DEVICE }}
+      STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+      STAGING_SSH_PASSWORD: ${{ secrets.STAGING_SSH_PASSWORD }}
+      STAGING_GPU_DEVICE: ${{ vars.STAGING_GPU_DEVICE }}
+      DOMAIN: ${{ vars.DOMAIN }}
+    steps:
+      - uses: actions/checkout@v3
+      # This is to fix GIT not liking owner of the checkout dir - https://github.com/actions/runner/issues/2033#issuecomment-1204205989
+      - run: chown -R $(id -u):$(id -g) $PWD
+      - run: if [[ $GITHUB_REF_NAME == "main" ]]; then echo "TAG=latest" >> $GITHUB_ENV ; else echo "TAG=dev" >> $GITHUB_ENV ; fi;
+      - run: if [[ $GITHUB_REF_NAME == "main" ]]; then printenv PROD_CONFIG > "$(pwd)/.env" ; else printenv STAGING_CONFIG > "$(pwd)/.env" ; fi;
+
+      - run: if [[ $GITHUB_REF_NAME == "main" ]]; then echo "SSH_USER=$PROD_SSH_USER" >> $GITHUB_ENV ; else echo "SSH_USER=$STAGING_SSH_USER" >> $GITHUB_ENV ; fi;
+      - run: if [[ $GITHUB_REF_NAME == "main" ]]; then echo "SSH_PASSWORD=$PROD_SSH_PASSWORD" >> $GITHUB_ENV ; else echo "SSH_PASSWORD=$STAGING_SSH_PASSWORD" >> $GITHUB_ENV ; fi;
+      - run: if [[ $GITHUB_REF_NAME == "main" ]]; then echo "GPU_DEVICE=$PROD_GPU_DEVICE" >> $GITHUB_ENV ; else echo "GPU_DEVICE=$STAGING_GPU_DEVICE" >> $GITHUB_ENV ; fi;
+
+      # - run: sed 's/\"//g' .env >> $GITHUB_ENV
+      - run: echo "PATH=$PATH:/github/home/.local/bin" >> $GITHUB_ENV
+      - run: 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client git -y )'
+      - run: apt-get update -y && apt-get install sshpass -y
+      - run: eval $(ssh-agent -s)
+      - run: mkdir -p ~/.ssh
+      - run: chmod 700 ~/.ssh
+
+      - run: sshpass -p "$SSH_PASSWORD" ssh -p 13402 -o StrictHostKeyChecking=no "$SSH_USER"@"$DOMAIN" "docker images" # nosemgrep
+      - run: bash ./scripts/deploy.sh
