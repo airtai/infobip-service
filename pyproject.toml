@@ -41,6 +41,7 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
+    "faststream[kafka]==0.3.13",
 ]
 
 [project.optional-dependencies]
@@ -82,6 +83,7 @@ lint = [
 test-core = [
     "coverage[toml]==7.4.0",
     "pytest==7.4.4",
+    "pytest-asyncio==0.23.3",
 ]
 
 testing = [
@@ -141,7 +143,7 @@ disallow_any_unimported = false
 fix = true
 line-length = 88
 target-version = "py38"
-include = ["infobip_service/**/*.py", "infobip_service/**/*.pyi", "infobip_service/**/*.py", "infobip_service/**/*.py", "infobip_service.toml"]
+include = ["infobip_service/**/*.py", "infobip_service/**/*.pyi", "infobip_service/**/*.py", "infobip_service/**/*.py", "tests/**/*.py", "infobip_service.toml", "pyproject.toml"]
 exclude = ["docs/docs_src"]
 
 [tool.ruff.lint]
