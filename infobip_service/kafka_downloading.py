@@ -22,7 +22,7 @@ if group_id is None:
     )
 logger.info(f"{group_id=}")
 
-root_path = Path(environ.get("ROOT_PATH")) if environ.get("ROOT_PATH") else None
+root_path = Path(environ.get("ROOT_PATH")) if environ.get("ROOT_PATH") else None # type: ignore [arg-type]
 if root_path is None:
     root_path = Path() / group_id
 
@@ -41,9 +41,9 @@ if with_security:
         username=environ["KAFKA_API_KEY"],
         password=environ["KAFKA_API_SECRET"],
     )
-    kwargs["security"] = security
+    kwargs["security"] = security # type: ignore [assignment]
 
-broker = KafkaBroker(f"{environ['KAFKA_HOSTNAME']}:{environ['KAFKA_PORT']}", **kwargs)
+broker = KafkaBroker(f"{environ['KAFKA_HOSTNAME']}:{environ['KAFKA_PORT']}", **kwargs) # type: ignore [arg-type]
 
 username = environ.get("USERNAME", "infobip")
 
@@ -67,7 +67,7 @@ async def on_training_model_start(
         ModelId = msg.ModelId# noqa: N806
 
         dt = datetime.now().date().isoformat()
-        path = root_path / f"AccountId-{AccountId}" / f"ApplicationId-{ApplicationId}" / f"ModelId-{ModelId}" / dt
+        path = root_path / f"AccountId-{AccountId}" / f"ApplicationId-{ApplicationId}" / f"ModelId-{ModelId}" / dt # type: ignore [operator]
 
 
         training_model_status = TrainingModelStatus(

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Callable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, NonNegativeInt, SerializeAsAny, field_serializer
 
@@ -31,7 +31,7 @@ class LogMessage(BaseModel):
     original_message: SerializeAsAny[Optional[BaseModel]] = Field(...)
 
     @field_serializer("timestamp")
-    def serialize_timestamp(self, timestamp: datetime, _info):
+    def serialize_timestamp(self, timestamp: datetime, _info: Any) -> str:
         return timestamp.strftime("%Y-%m-%dT%H:%M:%S")
 
 
@@ -126,7 +126,7 @@ class EventData(BaseModel):
     )
 
     @field_serializer("OccurredTime")
-    def serialize_timestamp(self, timestamp: datetime, _info):
+    def serialize_timestamp(self, timestamp: datetime, _info: Any) -> str:
         return timestamp.strftime("%Y-%m-%dT%H:%M:%S")
 
 
