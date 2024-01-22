@@ -41,6 +41,7 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
+    "tpk"
 ]
 
 [project.optional-dependencies]
