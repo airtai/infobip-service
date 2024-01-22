@@ -1,15 +1,21 @@
 from datetime import datetime, timedelta
-from typing import List, Optional
+from pathlib import Path
+from typing import Optional, Tuple
 
-# import pandas as pd
+import numpy as np
+import pandas as pd
+import torch
+from torch.utils.data import Dataset
 
-# from infobip_service.preprocessing import processed_data_path
-
-timedelta_buckets = [timedelta(days=days) for days in [1, 3, 7, 14, 28]]
+timedelta_buckets = np.array(
+    [timedelta(days=days) for days in [1, 3, 7, 14, 28]], dtype="timedelta64[ms]"
+)
 
 
 def _bin_timedelta(
-    timedelta: timedelta, *, timedelta_buckets: List[timedelta] = timedelta_buckets
+    timedelta: timedelta,
+    *,
+    timedelta_buckets: np.ndarray = timedelta_buckets,  # type: ignore
 ) -> int:
     for class_value, timedelta_key in enumerate(timedelta_buckets):
         if timedelta < timedelta_key:
@@ -22,18 +28,40 @@ def bin_next_event_user_history(
     user_history: Optional[datetime],
     *,
     t0: datetime,
-    timedelta_buckets: List[timedelta] = timedelta_buckets,
+    timedelta_buckets: np.ndarray = timedelta_buckets,  # type: ignore
 ) -> int:
     if user_history is None:
         return len(timedelta_buckets)
     return _bin_timedelta(user_history - t0, timedelta_buckets=timedelta_buckets)
 
 
-# def load_dataset(
-#     processed_data_path: Path = processed_data_path,
-# ) -> Tuple[ListDataset, ListDataset, ListDataset]:
-#     train_set = pd.read_parquet(processed_data_path / "train_prepared.parquet")
-#     validation_set = pd.read_parquet(
-#         processed_data_path / "validation_prepared.parquet"
-#     )
-#     test_set = pd.read_parquet(processed_data_path / "test_prepared.parquet")
+class UserHistoryDataset(Dataset):  # type: ignore
+    """Dataset for user histories."""
+
+    def __init__(self, histories_path: Path):
+        """Initialize dataset."""
+        self.histories = pd.read_parquet(histories_path).sort_index()
+        self.sample_indexes = list(
+            {sample_indexes for sample_indexes, _ in self.histories.index}
+        )
+
+    def __len__(self) -> int:
+        return len(self.sample_indexes)
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        actions = self.histories.loc[[(self.sample_indexes[idx], "DefinitionId")]]
+        times = self.histories.loc[[(self.sample_indexes[idx], "OccurredTime")]]
+        times[times.columns] = times[times.columns].apply(pd.to_datetime)
+
+        historic_actions = actions.loc[:, actions.columns != "NextEvent"].to_numpy()[0]
+        next_action = actions.loc[:, actions.columns == "NextEvent"].to_numpy()[0][0]
+
+        historic_times = times.loc[:, times.columns != "NextEvent"].to_numpy()[0]
+        next_time = times.loc[:, times.columns == "NextEvent"].to_numpy()[0][0]
+
+        x = np.stack([historic_actions, historic_times], axis=-1)
+        y = bin_next_event_user_history(
+            None if pd.isnull(next_action) else next_time, t0=historic_times[-1]
+        )
+
+        return torch.from_numpy(x), torch.Tensor([y])

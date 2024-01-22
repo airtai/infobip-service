@@ -1,6 +1,8 @@
-from infobip_service.load_dataset import bin_next_event_user_history, _bin_timedelta
+from infobip_service.load_dataset import bin_next_event_user_history, _bin_timedelta, UserHistoryDataset
+from infobip_service.preprocessing import processed_data_path
 from datetime import datetime, timedelta
 import pandas as pd
+import pytest
 
 user_history = pd.DataFrame({
         "AccountId": [12345, 12345, 12345],
@@ -32,3 +34,33 @@ def test_bin_next_event_user_history():
     assert bin_next_event_user_history(datetime(2023, 8, 7), t0=datetime(2023, 7, 10)) == 5 # 28 days to first event
     assert bin_next_event_user_history(datetime(2023, 8, 11), t0=datetime(2023, 7, 10)) == 5 # 32 days to first event
     assert bin_next_event_user_history(None, t0=datetime(2023, 7, 10)) == 5 # No next event
+
+@pytest.mark.skip(reason="Dataset not available on CI/CD")
+def test_train_dataset():
+    train_dataset = UserHistoryDataset(processed_data_path/"train_prepared.parquet")
+
+    for i in range(100):
+        x, y = train_dataset[i]
+        assert x.shape == (64, 2)
+        assert y >= 0
+        assert y <= 5
+
+@pytest.mark.skip(reason="Dataset not available on CI/CD")
+def test_test_dataset():
+    test_dataset = UserHistoryDataset(processed_data_path/"test_prepared.parquet")
+
+    for i in range(100):
+        x, y = test_dataset[i]
+        assert x.shape == (64, 2)
+        assert y >= 0
+        assert y <= 5
+
+@pytest.mark.skip(reason="Dataset not available on CI/CD")
+def test_val_dataset():
+    val_dataset = UserHistoryDataset(processed_data_path/"validation_prepared.parquet")
+
+    for i in range(100):
+        x, y = val_dataset[i]
+        assert x.shape == (64, 2)
+        assert y >= 0
+        assert y <= 5
