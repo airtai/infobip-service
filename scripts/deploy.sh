@@ -6,8 +6,8 @@ set +a
 
 if test -z "$CI_REGISTRY_IMAGE"
 then
-	echo "INFO: CI_REGISTRY_IMAGE variable not set, setting it to 'ghcr.io/airtai/infobip-kafka-service'"
-	export CI_REGISTRY_IMAGE="ghcr.io/airtai/infobip-kafka-service"
+	echo "INFO: CI_REGISTRY_IMAGE variable not set, setting it to 'ghcr.io/airtai/infobip-service'"
+	export CI_REGISTRY_IMAGE="ghcr.io/airtai/infobip-service"
 fi
 
 if test -z "$TAG"
