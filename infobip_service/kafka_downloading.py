@@ -45,7 +45,8 @@ if with_security:
     )
     kwargs["security"] = security  # type: ignore [assignment]
 
-broker = KafkaBroker(f"{environ['KAFKA_HOSTNAME']}:{environ['KAFKA_PORT']}", **kwargs)  # type: ignore [arg-type]
+bootstrap_servers = [f"{x}:{environ['KAFKA_PORT']}"for x in environ['KAFKA_HOSTNAME'].split(",")]
+broker = KafkaBroker(bootstrap_servers=bootstrap_servers, **kwargs)  # type: ignore [arg-type]
 
 username = environ.get("USERNAME", "infobip")
 
