@@ -262,3 +262,27 @@ class TrainingModelStatus(BaseModel):
         examples=[20],
         description="total number of steps for training the model",
     )
+
+
+class StartPrediction(BaseModel):
+    """Request to start prediction."""
+
+    AccountId: NonNegativeInt = Field(
+        ..., example=202020, description="ID of an account"
+    )
+    ApplicationId: Optional[str] = Field(
+        default=None,
+        example="TestApplicationId",
+        description="Id of the application in case there is more than one for the AccountId",
+    )
+    ModelId: str = Field(
+        ...,
+        example="ChurnModelForDrivers",
+        description="User supplied ID of the model trained",
+    )
+
+    task_type: TaskType = Field(
+        ...,
+        example="churn",
+        description="Name of the model used (churn, propensity to buy)",
+    )

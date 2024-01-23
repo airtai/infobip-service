@@ -3,7 +3,7 @@ import tempfile
 from contextlib import contextmanager
 from os import environ
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote_plus as urlquote
 
 import dask.dataframe as dd
@@ -233,3 +233,33 @@ if __name__ == "__main__":
 
     ddf = dd.read_parquet(raw_data_path)  # type: ignore
     logging.info(f"{ddf.shape[0].compute()=:,d}")
+
+
+def _get_unique_account_ids_model_ids(
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    database: str,
+    protocol: str,
+    table: str,
+) -> List[Dict[str, int]]:
+    with get_clickhouse_connection(
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        database=database,
+        table=table,
+        protocol=protocol,
+    ) as connection:
+        query = f"select DISTINCT on (AccountId, ModelId, ApplicationId) AccountId, ModelId, ApplicationId from {table}"  # nosec B608:hardcoded_sql_expressions
+        df = pd.read_sql(sql=query, con=connection)
+    return df.to_dict("records")  # type: ignore
+
+
+def get_unique_account_ids_model_ids() -> List[Dict[str, int]]:
+    db_params = get_clickhouse_params_from_env_vars()
+    # Replace infobip_data with infobip_start_training_data for table param
+    db_params["table"] = "infobip_start_training_data"
+    return _get_unique_account_ids_model_ids(**db_params)  # type: ignore

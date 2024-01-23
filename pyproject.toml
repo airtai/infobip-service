@@ -42,6 +42,7 @@ dynamic = ["version"]
 
 dependencies = [
     "faststream[kafka]==0.3.13",
+    "rocketry==2.5.1",
 ]
 
 [project.optional-dependencies]
