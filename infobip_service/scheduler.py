@@ -71,7 +71,7 @@ async def start_daily_prediction() -> None:
 
 
 async def main() -> None:
-    "Launch Rocketry app"
+    """Launch Rocketry app."""
     rocketry_task = asyncio.create_task(app.serve())
     await rocketry_task
 
