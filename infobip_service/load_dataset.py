@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -38,18 +38,27 @@ def bin_next_event_user_history(
 class UserHistoryDataset(Dataset):  # type: ignore
     """Dataset for user histories."""
 
-    def __init__(self, histories_path: Path):
+    def __init__(self, histories_path: Path, definitionId_vocab: List[str]):
         """Initialize dataset."""
         self.histories = pd.read_parquet(histories_path).sort_index()
         self.sample_indexes = list(
             {sample_indexes for sample_indexes, _ in self.histories.index}
         )
+        self.definitionId_vocab = definitionId_vocab
+
+    def _embed_vocab(self, x: str) -> int:
+        try:
+            return self.definitionId_vocab.index(x)
+        except ValueError:
+            return len(self.definitionId_vocab)
 
     def __len__(self) -> int:
         return len(self.sample_indexes)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        actions = self.histories.loc[[(self.sample_indexes[idx], "DefinitionId")]]
+        actions = self.histories.loc[
+            [(self.sample_indexes[idx], "DefinitionId")]
+        ].apply(lambda x: self._embed_vocab(x))
         times = self.histories.loc[[(self.sample_indexes[idx], "OccurredTime")]]
         times[times.columns] = times[times.columns].apply(pd.to_datetime)
 
@@ -59,9 +68,13 @@ class UserHistoryDataset(Dataset):  # type: ignore
         historic_times = times.loc[:, times.columns != "NextEvent"].to_numpy()[0]
         next_time = times.loc[:, times.columns == "NextEvent"].to_numpy()[0][0]
 
-        x = np.stack([historic_actions, historic_times], axis=-1)
+        x = np.stack(
+            [historic_actions, historic_times.astype("datetime64[s]").astype("int")],
+            axis=-1,
+        )
         y = bin_next_event_user_history(
-            None if pd.isnull(next_action) else next_time, t0=historic_times[-1]
+            None if next_action == len(self.definitionId_vocab) else next_time,
+            t0=historic_times[-1],
         )
 
         return torch.from_numpy(x), torch.Tensor([y])
