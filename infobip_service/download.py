@@ -204,7 +204,6 @@ def download_account_id_rows_as_parquet(
     application_id: Optional[str],
     history_size: Optional[int] = None,
     chunksize: Optional[int] = 1_000_000,
-    index_column: str = "PersonId",
     output_path: Path,
 ) -> None:
     db_params = get_clickhouse_params_from_env_vars()
@@ -214,7 +213,6 @@ def download_account_id_rows_as_parquet(
         application_id=application_id,
         history_size=history_size,
         chunksize=chunksize,
-        index_column=index_column,
         output_path=output_path,
         **db_params,  # type: ignore
     )
