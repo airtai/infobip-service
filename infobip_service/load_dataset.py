@@ -24,6 +24,13 @@ def _bin_timedelta(
     return len(timedelta_buckets)
 
 
+def embed_vocab(x: str, vocab: List[str]) -> int:
+    try:
+        return vocab.index(x)
+    except (ValueError, TypeError):
+        return len(vocab)
+
+
 def bin_next_event_user_history(
     user_history: Optional[datetime],
     *,
@@ -46,24 +53,24 @@ class UserHistoryDataset(Dataset):  # type: ignore
         )
         self.definitionId_vocab = definitionId_vocab
 
-    def _embed_vocab(self, x: str) -> int:
-        try:
-            return self.definitionId_vocab.index(x)
-        except ValueError:
-            return len(self.definitionId_vocab)
-
     def __len__(self) -> int:
         return len(self.sample_indexes)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        actions = self.histories.loc[
-            [(self.sample_indexes[idx], "DefinitionId")]
-        ].apply(lambda x: self._embed_vocab(x))
+        actions = self.histories.loc[[(self.sample_indexes[idx], "DefinitionId")]]
         times = self.histories.loc[[(self.sample_indexes[idx], "OccurredTime")]]
         times[times.columns] = times[times.columns].apply(pd.to_datetime)
 
-        historic_actions = actions.loc[:, actions.columns != "NextEvent"].to_numpy()[0]
-        next_action = actions.loc[:, actions.columns == "NextEvent"].to_numpy()[0][0]
+        historic_actions = np.apply_along_axis(
+            lambda x: embed_vocab(x, self.definitionId_vocab),
+            0,
+            actions.loc[:, actions.columns != "NextEvent"].to_numpy(),
+        )
+        next_action = np.apply_along_axis(
+            lambda x: embed_vocab(x, self.definitionId_vocab),
+            0,
+            actions.loc[:, actions.columns == "NextEvent"].to_numpy(),
+        )[0]
 
         historic_times = times.loc[:, times.columns != "NextEvent"].to_numpy()[0]
         next_time = times.loc[:, times.columns == "NextEvent"].to_numpy()[0][0]
