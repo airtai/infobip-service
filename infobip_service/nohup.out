@@ -27,3 +27,10 @@ Splitting data...
 Data split to train/validation.
 Preparing data...
 Data prepared.
+<Client: 'tcp://127.0.0.1:46331' processes=8 threads=64, memory=251.55 GiB>
+Traceback (most recent call last):
+  File "/home/tvrtko/Infobip-service/infobip_service/preprocessing.py", line 470, in <module>
+    calculate_vocab(
+  File "/home/tvrtko/Infobip-service/infobip_service/preprocessing.py", line 440, in calculate_vocab
+    with open(processed_data_path / f"{column}_vocab.json", "w") as f:
+FileNotFoundError: [Errno 2] No such file or directory: '../data/processed/DefinitionId_vocab.json'
