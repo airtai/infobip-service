@@ -45,7 +45,9 @@ if with_security:
     )
     kwargs["security"] = security  # type: ignore [assignment]
 
-bootstrap_servers = [f"{x}:{environ['KAFKA_PORT']}"for x in environ['KAFKA_HOSTNAME'].split(",")]
+bootstrap_servers = [
+    f"{x}:{environ['KAFKA_PORT']}" for x in environ["KAFKA_HOSTNAME"].split(",")
+]
 broker = KafkaBroker(bootstrap_servers=bootstrap_servers, **kwargs)  # type: ignore [arg-type]
 
 username = environ.get("USERNAME", "infobip")
@@ -70,7 +72,7 @@ async def on_training_model_start(msg: TrainingModelStart) -> None:
 
         dt = datetime.now().date().isoformat()
         path = (
-            root_path   # type: ignore [operator]
+            root_path  # type: ignore [operator]
             / f"AccountId-{AccountId}"
             / f"ApplicationId-{ApplicationId}"
             / f"ModelId-{ModelId}"
