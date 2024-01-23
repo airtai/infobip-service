@@ -245,8 +245,8 @@ def test_pandas2dask():
             index=pd.Index([1, 2, 2, 3, 3, 3], name="PersonId"),
         )
         expected["OccurredTime"] = pd.to_datetime(expected["OccurredTime"])
-        expected["DefinitionId"] = expected["DefinitionId"].astype("string[pyarrow]")
-        expected["ApplicationId"] = expected["ApplicationId"].astype("string[pyarrow]")
+        expected["DefinitionId"] = expected["DefinitionId"].astype("string[python]")
+        expected["ApplicationId"] = expected["ApplicationId"].astype("string[python]")
 
         pd.testing.assert_frame_equal(ddf.compute(), expected)
 
