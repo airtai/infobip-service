@@ -1,8 +1,10 @@
+import torch
+
 from infobip_service.model import build_embedding_layer_category
 
 def test_build_embedding_layer_category():
     layer = build_embedding_layer_category(
-        "DefinitionId", ["Entered_flow", "Exited_flow"], embedding_dim=10
+        "DefinitionId", 3, embedding_dim=10
     )
-    actual = layer(["Entered_flow", "Exited_flow"])
+    actual = layer(torch.Tensor([0, 2]).to(torch.int64))
     assert actual.shape == (2, 10)
