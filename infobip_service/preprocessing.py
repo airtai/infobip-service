@@ -446,8 +446,6 @@ def calculate_time_mean_std(
     *,
     processed_data_path: Path,
 ) -> None:
-    processed_data_path.mkdir(exist_ok=True)
-
     time_mean, time_std = (
         ddf["OccurredTime"].compute().mean(),
         ddf["OccurredTime"].std().compute(),
@@ -467,6 +465,8 @@ if __name__ == "__main__":
     client = Client(cluster)  # type: ignore
 
     print(client)  # noqa: T201
+
+    processed_data_path.mkdir(exist_ok=True)
 
     try:
         calculate_vocab(
