@@ -2,6 +2,7 @@ from infobip_service.load_dataset import bin_next_event_user_history, _bin_timed
 from infobip_service.preprocessing import processed_data_path
 from datetime import datetime, timedelta
 import pandas as pd
+import json
 import pytest
 
 user_history = pd.DataFrame({
@@ -37,7 +38,10 @@ def test_bin_next_event_user_history():
 
 @pytest.mark.skip(reason="Dataset not available on CI/CD")
 def test_train_dataset():
-    train_dataset = UserHistoryDataset(processed_data_path/"train_prepared.parquet")
+    with open(processed_data_path/"DefinitionId_vocab.json", "rb") as f:
+        vocab = json.load(f)
+
+    train_dataset = UserHistoryDataset(processed_data_path/"train_prepared.parquet", definitionId_vocab=vocab)
 
     for i in range(100):
         x, y = train_dataset[i]
@@ -47,7 +51,10 @@ def test_train_dataset():
 
 @pytest.mark.skip(reason="Dataset not available on CI/CD")
 def test_test_dataset():
-    test_dataset = UserHistoryDataset(processed_data_path/"test_prepared.parquet")
+    with open(processed_data_path/"DefinitionId_vocab.json", "rb") as f:
+        vocab = json.load(f)
+
+    test_dataset = UserHistoryDataset(processed_data_path/"test_prepared.parquet", definitionId_vocab=vocab)
 
     for i in range(100):
         x, y = test_dataset[i]
@@ -57,7 +64,10 @@ def test_test_dataset():
 
 @pytest.mark.skip(reason="Dataset not available on CI/CD")
 def test_val_dataset():
-    val_dataset = UserHistoryDataset(processed_data_path/"validation_prepared.parquet")
+    with open(processed_data_path/"DefinitionId_vocab.json", "rb") as f:
+        vocab = json.load(f)
+
+    val_dataset = UserHistoryDataset(processed_data_path/"validation_prepared.parquet", definitionId_vocab=vocab)
 
     for i in range(100):
         x, y = val_dataset[i]
