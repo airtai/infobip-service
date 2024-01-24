@@ -41,7 +41,8 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
-    "tpk"
+    "torch>=1.10.0, <2.0.0",
+    "tqdm>=4.66",
 ]
 
 [project.optional-dependencies]

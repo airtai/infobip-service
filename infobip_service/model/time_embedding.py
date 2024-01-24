@@ -42,37 +42,46 @@ def create_period_normalization(name: str, period: str) -> Callable[[Any], Any]:
     return _inner
 
 
+class TimeEmbedding(torch.nn.Module):
+    """Time embedding layer."""
+
+    def __init__(
+        self,
+        name: str,
+        mean: float,
+        std: float,
+        output_dim: int,
+    ):
+        """Time embedding layer initialization method."""
+        super().__init__()
+        self.name = name
+        self.mean = mean
+        self.std = std
+        self.period_normalizations = {
+            f"{name}_{period}_normalization": create_period_normalization(name, period)
+            for period in PERIODS
+        }
+        self.linear = Linear(in_features=len(PERIODS) * 2 + 1, out_features=output_dim)
+        self.activation = torch.nn.ELU()
+
+    def forward(self, x: Any) -> Any:
+        periods = [
+            self.period_normalizations[f"{k}_normalization"](v)
+            for k, v in expand_time_features({self.name: x}).items()
+        ]
+        time = (x - self.mean) / self.std
+
+        y = torch.cat(periods + [torch.unsqueeze(time, dim=-1)], dim=-1)  # noqa: RUF005
+
+        y = self.linear(y)
+        y = self.activation(y)
+        return y
+
+
 def build_embedding_layer_time(
     name: str,
     mean: float,
     std: float,
     output_dim: int,
 ) -> Callable[[Any], Any]:
-    period_normalizations = {
-        f"{name}_{period}_normalization": create_period_normalization(name, period)
-        for period in PERIODS
-    }
-
-    linear = Linear(in_features=len(PERIODS) * 2 + 1, out_features=output_dim)
-    activation = torch.nn.ELU()
-
-    def _inner(
-        x: Any,
-        mean: float = mean,
-        std: float = std,
-        period_normalizations: Any = period_normalizations,
-        linear: Linear = linear,
-    ) -> Any:
-        periods = [
-            period_normalizations[f"{k}_normalization"](v)
-            for k, v in expand_time_features({name: x}).items()
-        ]
-        time = (x - mean) / std
-
-        y = torch.cat(periods + [torch.unsqueeze(time, dim=-1)], dim=-1)  # noqa: RUF005
-
-        y = linear(y)
-        y = activation(y)
-        return y
-
-    return _inner
+    return TimeEmbedding(name, mean, std, output_dim)

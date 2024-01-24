@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Any, Dict
 
 import torch
 
@@ -38,7 +38,7 @@ class ChurnModel(torch.nn.Module):
         self.linear2 = torch.nn.Linear(32, churn_bucket_size)
         self.softmax = torch.nn.Softmax(dim=-1)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> Any:
         definiton_embeddings = self.definition_id_embedding(x.select(-1, 0))
         time_embeddings = self.time_embedding(x.select(-1, 1))
 
@@ -59,4 +59,4 @@ class ChurnModel(torch.nn.Module):
         y = self.linear2(y)
         y = self.softmax(y)
 
-        return y
+        return y.squeeze()

@@ -1,10 +1,9 @@
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-import torch
 from torch.utils.data import Dataset
 
 timedelta_buckets = np.array(
@@ -56,7 +55,7 @@ class UserHistoryDataset(Dataset):  # type: ignore
     def __len__(self) -> int:
         return len(self.sample_indexes)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[Any, int]:
         actions = self.histories.loc[[(self.sample_indexes[idx], "DefinitionId")]]
         times = self.histories.loc[[(self.sample_indexes[idx], "OccurredTime")]]
         times[times.columns] = times[times.columns].apply(pd.to_datetime)
@@ -84,4 +83,4 @@ class UserHistoryDataset(Dataset):  # type: ignore
             t0=historic_times[-1],
         )
 
-        return torch.from_numpy(x), torch.Tensor([y])
+        return x, y
