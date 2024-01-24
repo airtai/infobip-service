@@ -44,11 +44,10 @@ def create_period_normalization(name: str, period: str) -> Callable[[Any], Any]:
 
 def build_embedding_layer_time(
     name: str,
-    mean_and_std: Dict[str, float],
+    mean: float,
+    std: float,
     output_dim: int,
 ) -> Callable[[Any], Any]:
-    mean, std = mean_and_std["mean"], (mean_and_std["std"])
-
     period_normalizations = {
         f"{name}_{period}_normalization": create_period_normalization(name, period)
         for period in PERIODS
@@ -69,9 +68,10 @@ def build_embedding_layer_time(
             for k, v in expand_time_features({name: x}).items()
         ]
         time = (x - mean) / std
-        y = torch.cat(periods + [torch.unsqueeze(time, 0)])
 
-        y = linear(y.T)
+        y = torch.cat(periods + [torch.unsqueeze(time, dim=-1)], dim=-1)  # noqa: RUF005
+
+        y = linear(y)
         y = activation(y)
         return y
 

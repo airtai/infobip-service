@@ -31,7 +31,14 @@ def test_create_period_normalization():
 
 def test_build_embedding_layer_time():
     layer = build_embedding_layer_time(
-        "COMPLETE_REGST_EVENT_DATE", {"mean": 34.0, "std": 8.0}, output_dim=10
+        "COMPLETE_REGST_EVENT_DATE", mean=34.0, std=8.0, output_dim=10
     )
     actual = layer(torch.Tensor([25.0, 42.0]))
     assert actual.shape == (2, 10)
+
+def test_build_embedding_layer_time_batch():
+    layer = build_embedding_layer_time(
+        "COMPLETE_REGST_EVENT_DATE", mean=34.0, std=8.0, output_dim=10
+    )
+    actual = layer(torch.Tensor([[25.0, 42.0], [25.0, 42.0], [25.0, 42.0]]))
+    assert actual.shape == (3, 2, 10)

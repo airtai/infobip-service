@@ -437,7 +437,7 @@ def calculate_vocab(
     processed_data_path: Path,
 ) -> None:
     vocabulary = list(ddf[column].unique().compute())
-    with open(processed_data_path / f"{column}_vocab.json", "w") as f:
+    with Path.open(processed_data_path / f"{column}_vocab.json", "w") as f:
         json.dump(vocabulary, f)
 
 
@@ -456,7 +456,7 @@ def calculate_time_mean_std(
         "std": int(time_std.total_seconds()),
     }
 
-    with open(processed_data_path / "time_stats.json", "w") as f:
+    with Path.open(processed_data_path / "time_stats.json", "w") as f:
         json.dump(time_stats, f)
 
 
