@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from pathlib import Path
 from random import choice, randrange
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 import dask.dataframe as dd
 import numpy as np
@@ -75,7 +75,7 @@ def split_data(
     ddf: dd.DataFrame,  # type: ignore
     *,
     split_ratio: float = 0.8,
-) -> Tuple[dd.DataFrame, dd.DataFrame]:  # type: ignore
+) -> tuple[dd.DataFrame, dd.DataFrame]:  # type: ignore
     # ddf = ddf.set_index(ddf.index, sorted=True)
     user_index = ddf.index.unique().compute()
     train_index = np.random.choice(
@@ -270,7 +270,7 @@ def prepare_ddf(ddf: dd.DataFrame, *, history_size: int) -> dd.DataFrame:  # typ
 
 def preprocess_train_validation(
     raw_data_path: Path, preprocessed_data_path: Path
-) -> Tuple[dd.DataFrame, dd.DataFrame]:  # type: ignore
+) -> tuple[dd.DataFrame, dd.DataFrame]:  # type: ignore
     # Read raw data
     print("Reading raw data...")  # noqa: T201
     raw_data = dd.read_parquet(raw_data_path)  # type: ignore

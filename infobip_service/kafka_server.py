@@ -1,13 +1,14 @@
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, NonNegativeInt, SerializeAsAny, field_serializer
 
 from infobip_service.logger import get_logger, supress_timestamps
 
-get_count_for_account_id: Optional[Callable[[int, str], Tuple[int, datetime]]] = None
-get_all_person_ids_for_account_id: Optional[Callable[[int, str], List[int]]] = None
+get_count_for_account_id: Optional[Callable[[int, str], tuple[int, datetime]]] = None
+get_all_person_ids_for_account_id: Optional[Callable[[int, str], list[int]]] = None
 
 
 supress_timestamps(False)
@@ -185,7 +186,7 @@ class TrainingModelStart(BaseModel):
     )
 
 
-def get_key(msg: BaseModel, attrs: Optional[List[str]] = None) -> bytes:
+def get_key(msg: BaseModel, attrs: Optional[list[str]] = None) -> bytes:
     if attrs is None:
         attrs = ["AccountId", "ModelId"]
 
@@ -268,21 +269,21 @@ class StartPrediction(BaseModel):
     """Request to start prediction."""
 
     AccountId: NonNegativeInt = Field(
-        ..., example=202020, description="ID of an account"
+        ..., examples=[202020], description="ID of an account"
     )
     ApplicationId: Optional[str] = Field(
         default=None,
-        example="TestApplicationId",
+        examples=["TestApplicationId"],
         description="Id of the application in case there is more than one for the AccountId",
     )
     ModelId: str = Field(
         ...,
-        example="ChurnModelForDrivers",
+        examples=["ChurnModelForDrivers"],
         description="User supplied ID of the model trained",
     )
 
     task_type: TaskType = Field(
         ...,
-        example="churn",
+        examples=["churn"],
         description="Name of the model used (churn, propensity to buy)",
     )

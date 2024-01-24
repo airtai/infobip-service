@@ -3,7 +3,7 @@ import tempfile
 from contextlib import contextmanager
 from os import environ
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 from urllib.parse import quote_plus as urlquote
 
 import dask.dataframe as dd
@@ -65,7 +65,7 @@ def create_db_uri_for_clickhouse_datablob(
     return clickhouse_uri
 
 
-def get_clickhouse_params_from_env_vars() -> Dict[str, Union[str, int]]:
+def get_clickhouse_params_from_env_vars() -> dict[str, Union[str, int]]:
     return {
         "username": environ["KAFKA_CH_USERNAME"],
         "password": environ["KAFKA_CH_PASSWORD"],
@@ -243,7 +243,8 @@ def _get_unique_account_ids_model_ids(
     database: str,
     protocol: str,
     table: str,
-) -> List[Dict[str, int]]:
+) -> list[dict[str, int]]:
+    connection: Connection
     with get_clickhouse_connection(
         username=username,
         password=password,
@@ -258,7 +259,7 @@ def _get_unique_account_ids_model_ids(
     return df.to_dict("records")  # type: ignore
 
 
-def get_unique_account_ids_model_ids() -> List[Dict[str, int]]:
+def get_unique_account_ids_model_ids() -> list[dict[str, int]]:
     db_params = get_clickhouse_params_from_env_vars()
     # Replace infobip_data with infobip_start_training_data for table param
     db_params["table"] = "infobip_start_training_data"

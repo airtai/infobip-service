@@ -1,10 +1,10 @@
 from os import environ
-from typing import Any, Dict
+from typing import Any
 
 from aiokafka.helpers import create_ssl_context
 
 
-def get_aio_kafka_config() -> Dict[str, Any]:
+def get_aio_kafka_config() -> dict[str, Any]:
     kafka_server_url = environ["KAFKA_HOSTNAME"]
     kafka_server_port = environ["KAFKA_PORT"]
 
