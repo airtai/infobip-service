@@ -1,0 +1,7 @@
+rocketry==2.5.1
+pydantic==1.10.11
+aiokafka==0.8.1
+SQLAlchemy==1.4.41
+clickhouse-sqlalchemy==0.2.3
+clickhouse-driver[lz4]==0.2.5
+pandas==2.0.3
