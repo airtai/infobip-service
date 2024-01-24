@@ -35,6 +35,7 @@ jobs:
         shell: bash
         run: ruff infobip_service
 
+      - run: mkdir .mypy_cache
       - name: Run mypy
         shell: bash
         run: mypy infobip_service
