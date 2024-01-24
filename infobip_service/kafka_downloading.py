@@ -15,24 +15,25 @@ from infobip_service.logger import get_logger, supress_timestamps
 supress_timestamps(False)
 logger = get_logger(__name__)
 
-group_id = environ.get("DOWNLOADING_GROUP_ID", None)
-if group_id is None:
-    group_id = (
+downloading_group_id = environ.get("DOWNLOADING_GROUP_ID", None)
+if downloading_group_id is None:
+    downloading_group_id = (
         f"infobip-downloader-{random.randint(100_000_000, 999_999_999):0,d}".replace(  # nosec: B311:blacklist
             ",", "-"
         )
     )
-logger.info(f"{group_id=}")
+logger.info(f"{downloading_group_id=}")
 
 root_path = Path(environ.get("ROOT_PATH")) if environ.get("ROOT_PATH") else None  # type: ignore [arg-type]
 if root_path is None:
-    root_path = Path() / group_id
+    root_path = Path() / downloading_group_id
 
 kwargs = {
     "request_timeout_ms": 120_000,
     "max_batch_size": 120_000,
     "connections_max_idle_ms": 10_000,
-    # auto_offset_reset="earliest",
+    "group_id": downloading_group_id,
+    "auto_offset_reset": "earliest",
 }
 
 with_security = environ.get("WITH_SECURITY", "false").lower() == "true"
@@ -61,7 +62,7 @@ async def to_training_model_status(
     return training_model_status
 
 
-@broker.subscriber(f"{username}_training_model_start", auto_offset_reset="earliest")
+@broker.subscriber(f"{username}_training_model_start")
 async def on_training_model_start(msg: TrainingModelStart) -> None:
     try:
         logger.info(f"on_training_model_start({msg}) started")
