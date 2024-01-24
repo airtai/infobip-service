@@ -36,11 +36,11 @@ async def test_add_download_training_data(monkeypatch):
             mock_download_account_id_rows_as_parquet,
         )
 
-        app = FastStream(broker=broker)
+        _ = FastStream(broker=broker)
 
-        AccountId = 317238
-        ModelId = "10051"
-        ApplicationId = "MobileApp"
+        AccountId = 317238  # noqa: N806
+        ModelId = "10051"  # noqa: N806
+        ApplicationId = "MobileApp"  # noqa: N806
 
         training_model_start = TrainingModelStart(
             AccountId=AccountId,

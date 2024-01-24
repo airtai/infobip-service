@@ -135,18 +135,18 @@ def test_fill_na():
 
 def create_duplicated_test_ddf():
     df = pd.DataFrame(
-        dict(
-            AccountId=12345,
-            PersonId=[1, 2, 2, 3, 3, 3],
-            OccurredTime=[
+        {
+            "AccountId": 12345,
+            "PersonId": [1, 2, 2, 3, 3, 3],
+            "OccurredTime": [
                 datetime.fromisoformat(
                     f"2023-07-10T13:27:{i:02d}.{123456*(i+1) % 1_000_000:06d}"
                 )
                 for i in range(6)
             ],
-            DefinitionId=["one"] * 3 + ["two"] * 2 + ["three"],
-            ApplicationId=None,
-        )
+            "DefinitionId": ["one"] * 3 + ["two"] * 2 + ["three"],
+            "ApplicationId": None,
+        }
     )
     df["OccurredTimeTicks"] = df["OccurredTime"].astype(int) // 1000
     df = pd.concat([df] * 3)
@@ -267,7 +267,7 @@ def test_get_clickhouse_connection():
         xs = df.loc[(df.database == db_params["database"]) & (df.name == "events")]
         if xs.shape[0] > 0:
             query = f"RENAME TABLE {database}.events TO {database}.events_distributed"
-            ys = pd.read_sql(sql=query, con=connection)
+            _ = pd.read_sql(sql=query, con=connection)
 
 
 def test_get_unique_account_ids_model_ids(monkeypatch):

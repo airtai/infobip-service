@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from pathlib import Path
 from random import choice, randrange
-from typing import Any, Optional, Union
+from typing import Any
 
 import dask.dataframe as dd
 import numpy as np
@@ -39,7 +39,7 @@ def _remove_without_history(
     df: pd.DataFrame,
     *,
     time_treshold: datetime,
-    latest_event_delta: Optional[timedelta] = None,
+    latest_event_delta: timedelta | None = None,
 ) -> pd.DataFrame:
     if latest_event_delta is not None:
         indexes_with_history = df[
@@ -55,7 +55,7 @@ def remove_without_history(
     ddf: dd.DataFrame,  # type: ignore
     *,
     time_treshold: datetime,
-    latest_event_delta: Optional[timedelta] = None,
+    latest_event_delta: timedelta | None = None,
 ) -> dd.DataFrame:  # type: ignore
     meta = _remove_without_history(
         ddf._meta, time_treshold=time_treshold, latest_event_delta=latest_event_delta
@@ -167,7 +167,7 @@ def random_date(start: datetime, end: datetime) -> datetime:
     return start + timedelta(seconds=random_second)
 
 
-def convert_datetime(time: Union[str, pd.Timestamp]) -> datetime:
+def convert_datetime(time: str | pd.Timestamp) -> datetime:
     if isinstance(time, pd.Timestamp):
         return time.to_pydatetime()  # type: ignore
     try:
