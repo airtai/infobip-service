@@ -32,8 +32,8 @@ kwargs = {
     "request_timeout_ms": 120_000,
     "max_batch_size": 120_000,
     "connections_max_idle_ms": 10_000,
-    "group_id": downloading_group_id,
-    "auto_offset_reset": "earliest",
+    # "group_id": downloading_group_id,
+    # "auto_offset_reset": "earliest",
 }
 
 with_security = environ.get("WITH_SECURITY", "false").lower() == "true"
@@ -62,7 +62,11 @@ async def to_training_model_status(
     return training_model_status
 
 
-@broker.subscriber(f"{username}_training_model_start")
+@broker.subscriber(
+    f"{username}_training_model_start",
+    auto_offset_reset="earliest",
+    group_id=downloading_group_id,
+)
 async def on_training_model_start(msg: TrainingModelStart) -> None:
     try:
         logger.info(f"on_training_model_start({msg}) started")
