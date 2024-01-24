@@ -1,13 +1,14 @@
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any
 
 from pydantic import BaseModel, Field, NonNegativeInt, SerializeAsAny, field_serializer
 
 from infobip_service.logger import get_logger, supress_timestamps
 
-get_count_for_account_id: Optional[Callable[[int, str], Tuple[int, datetime]]] = None
-get_all_person_ids_for_account_id: Optional[Callable[[int, str], List[int]]] = None
+get_count_for_account_id: Callable[[int, str], tuple[int, datetime]] | None = None
+get_all_person_ids_for_account_id: Callable[[int, str], list[int]] | None = None
 
 
 supress_timestamps(False)
@@ -28,7 +29,7 @@ class LogMessage(BaseModel):
         json_schema_extra={"example": "something went wrong", "description": "message"},
     )
 
-    original_message: SerializeAsAny[Optional[BaseModel]] = Field(...)
+    original_message: SerializeAsAny[BaseModel | None] = Field(...)
 
     @field_serializer("timestamp")
     def serialize_timestamp(self, timestamp: datetime, _info: Any) -> str:
@@ -48,7 +49,7 @@ class ModelTrainingRequest(BaseModel):
     AccountId: NonNegativeInt = Field(
         ..., json_schema_extra={"example": 202020, "description": "ID of an account"}
     )
-    ApplicationId: Optional[str] = Field(
+    ApplicationId: str | None = Field(
         default=None,
         json_schema_extra={
             "example": "TestApplicationId",
@@ -83,7 +84,7 @@ class EventData(BaseModel):
     AccountId: NonNegativeInt = Field(
         ..., json_schema_extra={"example": 202020, "description": "ID of an account"}
     )
-    ApplicationId: Optional[str] = Field(
+    ApplicationId: str | None = Field(
         default=None,
         json_schema_extra={
             "example": "TestApplicationId",
@@ -165,7 +166,7 @@ class TrainingModelStart(BaseModel):
     AccountId: NonNegativeInt = Field(
         ..., examples=[202020], description="ID of an account"
     )
-    ApplicationId: Optional[str] = Field(
+    ApplicationId: str | None = Field(
         default=None,
         examples=["TestApplicationId"],
         description="Id of the application in case there is more than one for the AccountId",
@@ -185,7 +186,7 @@ class TrainingModelStart(BaseModel):
     )
 
 
-def get_key(msg: BaseModel, attrs: Optional[List[str]] = None) -> bytes:
+def get_key(msg: BaseModel, attrs: list[str] | None = None) -> bytes:
     if attrs is None:
         attrs = ["AccountId", "ModelId"]
 
@@ -204,8 +205,8 @@ class Tracker:
         self._limit = limit
         self._timeout = timeout
         self._abort_after = abort_after
-        self._count: Optional[int] = None
-        self._last_updated: Optional[datetime] = None
+        self._count: int | None = None
+        self._last_updated: datetime | None = None
         self._sterted_at: datetime = datetime.now()
 
     def update(self, count: int) -> bool:
@@ -236,7 +237,7 @@ class TrainingModelStatus(BaseModel):
     AccountId: NonNegativeInt = Field(
         ..., examples=[202020], description="ID of an account"
     )
-    ApplicationId: Optional[str] = Field(
+    ApplicationId: str | None = Field(
         default=None,
         examples=["TestApplicationId"],
         description="Id of the application in case there is more than one for the AccountId",
@@ -261,4 +262,28 @@ class TrainingModelStatus(BaseModel):
         ...,
         examples=[20],
         description="total number of steps for training the model",
+    )
+
+
+class StartPrediction(BaseModel):
+    """Request to start prediction."""
+
+    AccountId: NonNegativeInt = Field(
+        ..., examples=[202020], description="ID of an account"
+    )
+    ApplicationId: str | None = Field(
+        default=None,
+        examples=["TestApplicationId"],
+        description="Id of the application in case there is more than one for the AccountId",
+    )
+    ModelId: str = Field(
+        ...,
+        examples=["ChurnModelForDrivers"],
+        description="User supplied ID of the model trained",
+    )
+
+    task_type: TaskType = Field(
+        ...,
+        examples=["churn"],
+        description="Name of the model used (churn, propensity to buy)",
     )

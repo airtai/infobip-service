@@ -195,7 +195,6 @@ def test_split_data():
     user_histories["AccountId"] = user_histories["AccountId"].astype("string[pyarrow]")
 
     user_histories_ddf = dd.from_pandas(user_histories, npartitions=5)
-    user_histories_ddf
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         train, validation = split_data(user_histories_ddf, split_ratio=0.7)
@@ -252,7 +251,7 @@ def test_get_next_event_single_empty():
 
 @pytest.mark.skip("TODO: figure out multiindex construction")
 def test_get_next_event_group_by():
-    expected = pd.DataFrame(
+    _ = pd.DataFrame(
         {
             "AccountId": [None, 12345],
             "DefinitionId": [None, "one"],
@@ -263,7 +262,7 @@ def test_get_next_event_group_by():
         index=pd.Index(["NextEvent"] * 2),
     )
 
-    print(get_next_event(user_histories_df, t0=datetime(2023, 7, 19)))
+    print(get_next_event(user_histories_df, t0=datetime(2023, 7, 19)))  # noqa: T201
 
 
 def test_create_user_histories():
@@ -292,7 +291,7 @@ def test_sample_user_histories():
         max_time=datetime(2023, 7, 20),
         history_size=2,
     )
-    print(user_histories_sample)
+    print(user_histories_sample)  # noqa: T201
 
 
 def test_sample_user_histories_single():
@@ -303,7 +302,7 @@ def test_sample_user_histories_single():
         max_time=datetime(2023, 8, 20),
         history_size=2,
     )
-    print(user_histories_sample)
+    print(user_histories_sample)  # noqa: T201
 
 
 def test_prepare_data_ddf():
@@ -319,7 +318,7 @@ def test_prepare_data_ddf():
         user_histories_ddf, history_size=8, min_time=min_time, max_time=max_time
     )
 
-    print(sampled_data.head(4, npartitions=-1))
+    print(sampled_data.head(4, npartitions=-1))  # noqa: T201
 
 
 def test_prepare_data_ddf_single():
@@ -335,4 +334,4 @@ def test_prepare_data_ddf_single():
         user_history_ddf, history_size=8, min_time=min_time, max_time=max_time
     )
 
-    print(sampled_data.head(4, npartitions=-1))
+    print(sampled_data.head(4, npartitions=-1))  # noqa: T201

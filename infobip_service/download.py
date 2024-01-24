@@ -3,7 +3,7 @@ import tempfile
 from contextlib import contextmanager
 from os import environ
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 from urllib.parse import quote_plus as urlquote
 
 import dask.dataframe as dd
@@ -65,7 +65,7 @@ def create_db_uri_for_clickhouse_datablob(
     return clickhouse_uri
 
 
-def get_clickhouse_params_from_env_vars() -> Dict[str, Union[str, int]]:
+def get_clickhouse_params_from_env_vars() -> dict[str, str | int]:
     return {
         "username": environ["KAFKA_CH_USERNAME"],
         "password": environ["KAFKA_CH_PASSWORD"],
@@ -105,13 +105,13 @@ def get_clickhouse_connection(  # type: ignore
         yield connection
 
 
-def fillna(s: Optional[Any]) -> str:
+def fillna(s: Any | None) -> str:
     quote = "'"
     return f"{quote + ('' if s is None else str(s)) + quote}"
 
 
 def _pandas2dask_map(
-    df: pd.DataFrame, *, history_size: Optional[int] = None
+    df: pd.DataFrame, *, history_size: int | None = None
 ) -> pd.DataFrame:
     df = df.reset_index()
     df = df.sort_values(["PersonId", "OccurredTime", "OccurredTimeTicks"])
@@ -121,7 +121,7 @@ def _pandas2dask_map(
 
 
 def _pandas2dask(
-    downloaded_path: Path, output_path: Path, *, history_size: Optional[int] = None
+    downloaded_path: Path, output_path: Path, *, history_size: int | None = None
 ) -> None:
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
@@ -146,9 +146,9 @@ def _pandas2dask(
 
 def _download_account_id_rows_as_parquet(
     *,
-    account_id: Union[int, str],
-    application_id: Optional[str],
-    history_size: Optional[int] = None,
+    account_id: int | str,
+    application_id: str | None,
+    history_size: int | None = None,
     host: str,
     port: int,
     username: str,
@@ -156,7 +156,7 @@ def _download_account_id_rows_as_parquet(
     database: str,
     protocol: str,
     table: str,
-    chunksize: Optional[int] = 1_000_000,
+    chunksize: int | None = 1_000_000,
     output_path: Path,
 ) -> None:
     with get_clickhouse_connection(  # type: ignore
@@ -200,10 +200,10 @@ def _download_account_id_rows_as_parquet(
 
 def download_account_id_rows_as_parquet(
     *,
-    account_id: Union[int, str],
-    application_id: Optional[str],
-    history_size: Optional[int] = None,
-    chunksize: Optional[int] = 1_000_000,
+    account_id: int | str,
+    application_id: str | None,
+    history_size: int | None = None,
+    chunksize: int | None = 1_000_000,
     output_path: Path,
 ) -> None:
     db_params = get_clickhouse_params_from_env_vars()
@@ -233,3 +233,34 @@ if __name__ == "__main__":
 
     ddf = dd.read_parquet(raw_data_path)  # type: ignore
     logging.info(f"{ddf.shape[0].compute()=:,d}")
+
+
+def _get_unique_account_ids_model_ids(
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    database: str,
+    protocol: str,
+    table: str,
+) -> list[dict[str, int]]:
+    connection: Connection
+    with get_clickhouse_connection(
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        database=database,
+        table=table,
+        protocol=protocol,
+    ) as connection:
+        query = f"select DISTINCT on (AccountId, ModelId, ApplicationId) AccountId, ModelId, ApplicationId from {table}"  # nosec B608:hardcoded_sql_expressions
+        df = pd.read_sql(sql=query, con=connection)
+    return df.to_dict("records")  # type: ignore
+
+
+def get_unique_account_ids_model_ids() -> list[dict[str, int]]:
+    db_params = get_clickhouse_params_from_env_vars()
+    # Replace infobip_data with infobip_start_training_data for table param
+    db_params["table"] = "infobip_start_training_data"
+    return _get_unique_account_ids_model_ids(**db_params)  # type: ignore

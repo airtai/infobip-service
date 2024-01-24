@@ -15,7 +15,7 @@ import logging
 
 # Internal Cell
 import logging.config
-from typing import Any, Dict, List
+from typing import Any
 
 # Cell
 
@@ -41,7 +41,7 @@ def supress_timestamps(flag: bool = True) -> None:
     should_supress_timestamps = flag
 
 
-def get_default_logger_configuration(level: int = logging.INFO) -> Dict[str, Any]:
+def get_default_logger_configuration(level: int = logging.INFO) -> dict[str, Any]:
     """Return the common configurations for the logger.
 
     Args:
@@ -83,7 +83,7 @@ def get_default_logger_configuration(level: int = logging.INFO) -> Dict[str, Any
 
 # Cell
 
-logger_spaces_added: List[str] = []
+logger_spaces_added: list[str] = []
 
 
 def get_logger(name: str, *, level: int = logging.INFO) -> logging.Logger:

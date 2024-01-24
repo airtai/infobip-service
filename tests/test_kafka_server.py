@@ -8,6 +8,7 @@ from infobip_service.kafka_server import (
     EventData,
     LogMessage,
     ModelTrainingRequest,
+    StartPrediction,
     Tracker,
     TrainingDataStatus,
     TrainingModelStart,
@@ -187,3 +188,14 @@ def test_training_model_status():
 
     parsed = TrainingModelStatus.model_validate_json(actual)
     assert parsed == training_model_status
+
+
+def test_start_prediction():
+    model_metrics = StartPrediction(AccountId=12345, ModelId="10058", task_type="churn")
+
+    expected = (
+        '{"AccountId":12345,"ApplicationId":null,"ModelId":"10058","task_type":"churn"}'
+    )
+    actual = model_metrics.model_dump_json()
+
+    assert actual == expected, actual
