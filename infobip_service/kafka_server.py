@@ -294,3 +294,98 @@ class StartPrediction(BaseModel):
         examples=["churn"],
         description="Name of the model used (churn, propensity to buy)",
     )
+
+
+class ModelMetrics(BaseModel):
+    """The standard metrics for classification models.
+
+    The most important metrics is AUC for unbalanced classes such as churn. Metrics such as
+    accuracy are not very useful since they are easily maximized by outputting the most common
+    class all the time.
+    """
+
+    AccountId: NonNegativeInt = Field(
+        ..., examples=[202020], description="ID of an account"
+    )
+    ApplicationId: str | None = Field(
+        default=None,
+        examples=["TestApplicationId"],
+        description="Id of the application in case there is more than one for the AccountId",
+    )
+    ModelId: str = Field(
+        ...,
+        examples=["ChurnModelForDrivers"],
+        description="User supplied ID of the model trained",
+    )
+
+    timestamp: datetime = Field(
+        default_factory=datetime.now,
+        examples=["2021-03-28T00:34:08"],
+        description="UTC time when the model was trained",
+    )
+    task_type: TaskType = Field(
+        ...,
+        examples=["churn"],
+        description="Name of the model used (churn, propensity to buy)",
+    )
+
+    auc: float = Field(
+        ..., examples=[0.91], description="Area under ROC curve", ge=0.0, le=1.0
+    )
+    f1: float = Field(..., examples=[0.89], description="F-1 score", ge=0.0, le=1.0)
+    precission: float = Field(
+        ..., examples=[0.84], description="precission", ge=0.0, le=1.0
+    )
+    recall: float = Field(..., examples=[0.82], description="recall", ge=0.0, le=1.0)
+    accuracy: float = Field(
+        ..., examples=[0.82], description="accuracy", ge=0.0, le=1.0
+    )
+
+    if PYDANTIC_V2:
+
+        @field_serializer("timestamp")
+        def serialize_timestamp(self, timestamp: datetime, _info):
+            return timestamp.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+class Prediction(BaseModel):
+    AccountId: NonNegativeInt = Field(
+        ..., examples=[202020], description="ID of an account"
+    )
+    ApplicationId: str | None = Field(
+        default=None,
+        examples=["TestApplicationId"],
+        description="Id of the application in case there is more than one for the AccountId",
+    )
+    ModelId: str = Field(
+        ...,
+        examples=["ChurnModelForDrivers"],
+        description="User supplied ID of the model trained",
+    )
+
+    PersonId: NonNegativeInt = Field(
+        ..., examples=[12345678], description="ID of a person"
+    )
+    prediction_time: datetime = Field(
+        default_factory=datetime.now,
+        examples=["2021-03-28T00:34:08"],
+        description="UTC time of prediction",
+    )
+    task_type: TaskType = Field(
+        ...,
+        examples=["churn"],
+        description="Name of the model used (churn, propensity to buy)",
+    )
+    score: float = Field(
+        ...,
+        examples=[0.4321],
+        description="Prediction score (e.g. the probability of churn in the next 28 days)",
+        ge=0.0,
+        le=1.0,
+    )
+
+    if PYDANTIC_V2:
+
+        @field_serializer("prediction_time")
+        def serialize_timestamp(self, timestamp: datetime, _info):
+            return timestamp.strftime("%Y-%m-%dT%H:%M:%S")

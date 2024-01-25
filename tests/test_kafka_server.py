@@ -7,7 +7,9 @@ from pydantic import BaseModel
 from infobip_service.kafka_server import (
     EventData,
     LogMessage,
+    ModelMetrics,
     ModelTrainingRequest,
+    Prediction,
     StartPrediction,
     Tracker,
     TrainingDataStatus,
@@ -199,3 +201,65 @@ def test_start_prediction():
     actual = model_metrics.model_dump_json()
 
     assert actual == expected, actual
+
+
+def test_model_metrics():
+    model_metrics = ModelMetrics(
+        AccountId=12345,
+        ModelId="456",
+        timestamp="2021-03-28T00:34:08.123456",
+        task_type="churn",
+        auc=0.95,
+        recall=0.94,
+        precission=0.98,
+        accuracy=0.99,
+        f1=2 * 0.94 * 0.98 / (0.94 + 0.98),
+    )
+
+    expected = '{"AccountId":12345,"ApplicationId":null,"ModelId":"456","timestamp":"2021-03-28T00:34:08","task_type":"churn","auc":0.95,"f1":0.9595833333333332,"precission":0.98,"recall":0.94,"accuracy":0.99}'
+    actual = model_metrics.model_dump_json()
+
+    assert actual == expected, actual
+
+    model_metrics = ModelMetrics(
+        AccountId=12345,
+        ModelId="456",
+        timestamp="2021-03-28T00:34:08",
+        task_type="churn",
+        auc=0.95,
+        recall=0.94,
+        precission=0.98,
+        accuracy=0.99,
+        f1=2 * 0.94 * 0.98 / (0.94 + 0.98),
+    )
+
+    parsed = ModelMetrics.model_validate_json(actual)
+    assert parsed == model_metrics
+
+
+def test_prediction():
+    prediction = Prediction(
+        AccountId=12345,
+        ModelId="20001",
+        PersonId=123456789,
+        prediction_time="2021-03-28T00:34:08.123456",
+        task_type="churn",
+        score=0.873,
+    )
+
+    expected = '{"AccountId":12345,"ApplicationId":null,"ModelId":"20001","PersonId":123456789,"prediction_time":"2021-03-28T00:34:08","task_type":"churn","score":0.873}'
+    actual = prediction.model_dump_json()
+
+    assert actual == expected, actual
+
+    prediction = Prediction(
+        AccountId=12345,
+        ModelId="20001",
+        PersonId=123456789,
+        prediction_time="2021-03-28T00:34:08",
+        task_type="churn",
+        score=0.873,
+    )
+
+    parsed = Prediction.model_validate_json(actual)
+    assert parsed == prediction
