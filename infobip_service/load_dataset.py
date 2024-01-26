@@ -6,8 +6,10 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
 
+buckets = [1, 3, 7, 14, 28]
+
 timedelta_buckets = np.array(
-    [timedelta(days=days) for days in [1, 3, 7, 14, 28]], dtype="timedelta64[ms]"
+    [timedelta(days=days) for days in buckets], dtype="timedelta64[ms]"
 )
 
 

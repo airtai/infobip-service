@@ -4,6 +4,8 @@ from typing import Any, Callable, Dict, List
 import torch
 from scipy import interpolate
 
+from infobip_service.load_dataset import buckets
+
 from .category_embedding import build_embedding_layer_category
 from .time_embedding import build_embedding_layer_time
 
@@ -64,8 +66,10 @@ class ChurnModel(torch.nn.Module):
         return y.squeeze()
 
 
-def interpolate_cdf_from_pdf(pdf: List[float]) -> Callable[[float], float]:
-    x = [0, 1, 3, 7, 14, 28, 1000]
+def interpolate_cdf_from_pdf(
+    pdf: List[float], buckets: List[int] = buckets
+) -> Callable[[float], float]:
+    x = [0] + buckets + [1000]
     y = [0] + [sum(pdf[:i]) for i in range(1, len(pdf) + 1)]
     f = interpolate.interp1d(x, y)
     return f  # type: ignore
@@ -80,8 +84,10 @@ def cdf_after_x_days(
     return lambda x: coef * cdf(x) + bias
 
 
-def churn(pdf: List[float], days: float, time_to_churn: int) -> float:
-    cdf = interpolate_cdf_from_pdf(pdf)
+def churn(
+    pdf: List[float], days: float, time_to_churn: int, buckets: List[int] = buckets
+) -> float:
+    cdf = interpolate_cdf_from_pdf(pdf, buckets=buckets)
     cdf = cdf_after_x_days(cdf, days)
     return 1 - cdf(max(time_to_churn, days))
 
@@ -92,8 +98,10 @@ class ChurnProbabilityModel(torch.nn.Module):
     def __init__(
         self,
         churn_model: ChurnModel,
+        time_to_churn: int = buckets[-1],
     ):
         super().__init__()
+        self.time_to_churn = time_to_churn
         self.churn_model = churn_model
 
     def forward(self, x: torch.Tensor, observed_time: datetime) -> Any:
@@ -107,7 +115,9 @@ class ChurnProbabilityModel(torch.nn.Module):
             [event_probabilities, days_from_last_events.unsqueeze(-1)], axis=-1
         )
 
-        calculate_churn_for_row = lambda row: churn(row[0:-1], row[-1], 28)
+        calculate_churn_for_row = lambda row: churn(
+            row[0:-1], row[-1], time_to_churn=self.time_to_churn
+        )
 
         if len(combined.shape) == 1:
             return torch.tensor(calculate_churn_for_row(combined))  # type: ignore
