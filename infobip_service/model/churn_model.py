@@ -1,6 +1,8 @@
-from typing import Any, Dict
+from datetime import datetime
+from typing import Any, Callable, Dict, List
 
 import torch
+from scipy import interpolate
 
 from .category_embedding import build_embedding_layer_category
 from .time_embedding import build_embedding_layer_time
@@ -60,3 +62,54 @@ class ChurnModel(torch.nn.Module):
         y = self.softmax(y)
 
         return y.squeeze()
+
+
+def interpolate_cdf_from_pdf(pdf: List[float]) -> Callable[[float], float]:
+    x = [0, 1, 3, 7, 14, 28, 1000]
+    y = [0] + [sum(pdf[:i]) for i in range(1, len(pdf) + 1)]
+    f = interpolate.interp1d(x, y)
+    return f  # type: ignore
+
+
+def cdf_after_x_days(
+    cdf: Callable[[float], float], days: float
+) -> Callable[[float], float]:
+    prob = cdf(days)
+    coef = 1 / (1 - prob)
+    bias = -coef * prob
+    return lambda x: coef * cdf(x) + bias
+
+
+def churn(pdf: List[float], days: float, time_to_churn: int) -> float:
+    cdf = interpolate_cdf_from_pdf(pdf)
+    cdf = cdf_after_x_days(cdf, days)
+    return 1 - cdf(max(time_to_churn, days))
+
+
+class ChurnProbabilityModel(torch.nn.Module):
+    """Churn model."""
+
+    def __init__(
+        self,
+        churn_model: ChurnModel,
+    ):
+        super().__init__()
+        self.churn_model = churn_model
+
+    def forward(self, x: torch.Tensor, observed_time: datetime) -> Any:
+        event_probabilities = self.churn_model(x).detach()
+        last_events_times = x.select(-1, 1).select(-1, -1)
+
+        observed_time = torch.tensor(observed_time.timestamp())
+        days_from_last_events = (observed_time - last_events_times) / (3600 * 24)
+
+        combined = torch.cat(  # type: ignore
+            [event_probabilities, days_from_last_events.unsqueeze(-1)], axis=-1
+        )
+
+        calculate_churn_for_row = lambda row: churn(row[0:-1], row[-1], 28)
+
+        if len(combined.shape) == 1:
+            return torch.tensor(calculate_churn_for_row(combined))  # type: ignore
+        else:
+            return torch.tensor([calculate_churn_for_row(row) for row in combined])  # type: ignore

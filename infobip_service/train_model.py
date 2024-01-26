@@ -10,7 +10,7 @@ from infobip_service.model import ChurnModel  # type: ignore
 from infobip_service.preprocessing import processed_data_path
 
 
-def train_model(
+def _run_training_loop(
     model: ChurnModel,
     train_dataset: DataLoader,  # type: ignore
     validation_dataset: DataLoader,  # type: ignore
@@ -52,7 +52,7 @@ def train_model(
     return model
 
 
-if __name__ == "__main__":
+def train_model() -> None:
     with Path.open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
         vocab = json.load(f)
 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     )
 
     print("Training model...")
-    trained_model = train_model(
+    trained_model = _run_training_loop(
         model,
         datasets["train"],
         datasets["validation"],
@@ -90,3 +90,7 @@ if __name__ == "__main__":
         device="cuda" if torch.cuda.is_available() else "cpu",
     )
     print("Done.")
+
+
+if __name__ == "__main__":
+    train_model()
