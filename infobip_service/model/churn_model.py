@@ -69,7 +69,7 @@ class ChurnModel(torch.nn.Module):
 def interpolate_cdf_from_pdf(
     pdf: List[float], buckets: List[int] = buckets
 ) -> Callable[[float], float]:
-    x = [0] + buckets + [1000]
+    x = [0, *buckets, 1000]
     y = [0] + [sum(pdf[:i]) for i in range(1, len(pdf) + 1)]
     f = interpolate.interp1d(x, y)
     return f  # type: ignore

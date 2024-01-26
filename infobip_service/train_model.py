@@ -22,7 +22,6 @@ def _run_training_loop(
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = torch.nn.CrossEntropyLoss()
     for epoch in range(epochs):
-        print(f"Epoch: {epoch}")
         model.train()
         for batch in tqdm(train_dataset):
             optimizer.zero_grad()
@@ -34,7 +33,6 @@ def _run_training_loop(
             loss.backward()
             optimizer.step()
 
-        print("Validating...")
         model.eval()
         total_loss = 0.0
         with torch.no_grad():
