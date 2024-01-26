@@ -52,14 +52,13 @@ def _run_training_loop(
     return model
 
 
-def train_model() -> None:
+def train_model(processed_data_path: Path) -> torch.nn.Module:
     with Path.open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
         vocab = json.load(f)
 
     with Path.open(processed_data_path / "time_stats.json", "rb") as f:
         time_stats = json.load(f)
 
-    print("Loading datasets...")
     datasets = {
         k: DataLoader(
             UserHistoryDataset(
@@ -71,7 +70,6 @@ def train_model() -> None:
         )
         for k in ["train", "validation", "test"]
     }
-    print("Done.")
 
     model = ChurnModel(
         definition_id_vocab_size=len(vocab) + 1,
@@ -80,7 +78,6 @@ def train_model() -> None:
         churn_bucket_size=6,
     )
 
-    print("Training model...")
     trained_model = _run_training_loop(
         model,
         datasets["train"],
@@ -89,8 +86,9 @@ def train_model() -> None:
         learning_rate=0.001,
         device="cuda" if torch.cuda.is_available() else "cpu",
     )
-    print("Done.")
+
+    return trained_model
 
 
 if __name__ == "__main__":
-    train_model()
+    train_model(processed_data_path)
