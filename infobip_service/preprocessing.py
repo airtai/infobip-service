@@ -460,7 +460,7 @@ def calculate_time_mean_std(
         json.dump(time_stats, f)
 
 
-def preprocess_dataset() -> None:
+def _preprocess_dataset(raw_data_path: Path, processed_data_path: Path) -> None:
     cluster = LocalCluster()  # type: ignore
     client = Client(cluster)  # type: ignore
 
@@ -483,6 +483,10 @@ def preprocess_dataset() -> None:
     finally:
         client.close()  # type: ignore
         cluster.close()  # type: ignore
+
+
+def preprocess_dataset() -> None:
+    _preprocess_dataset(raw_data_path, processed_data_path)
 
 
 if __name__ == "__main__":
