@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Dict, List
+from typing import Any
 
 import torch
 from scipy import interpolate
@@ -16,7 +17,7 @@ class ChurnModel(torch.nn.Module):
     def __init__(
         self,
         definition_id_vocab_size: int,
-        time_normalization_params: Dict[str, float],
+        time_normalization_params: dict[str, float],
         embedding_dim: int = 10,
         churn_bucket_size: int = 6,
     ):
@@ -67,7 +68,7 @@ class ChurnModel(torch.nn.Module):
 
 
 def interpolate_cdf_from_pdf(
-    pdf: List[float], buckets: List[int] = buckets
+    pdf: list[float], buckets: list[int] = buckets
 ) -> Callable[[float], float]:
     x = [0, *buckets, 1000]
     y = [0] + [sum(pdf[:i]) for i in range(1, len(pdf) + 1)]
@@ -85,7 +86,7 @@ def cdf_after_x_days(
 
 
 def churn(
-    pdf: List[float], days: float, time_to_churn: int, buckets: List[int] = buckets
+    pdf: list[float], days: float, time_to_churn: int, buckets: list[int] = buckets
 ) -> float:
     cdf = interpolate_cdf_from_pdf(pdf, buckets=buckets)
     cdf = cdf_after_x_days(cdf, days)

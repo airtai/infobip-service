@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -25,7 +25,7 @@ def _bin_timedelta(
     return len(timedelta_buckets)
 
 
-def embed_vocab(x: str, vocab: List[str]) -> int:
+def embed_vocab(x: str, vocab: list[str]) -> int:
     try:
         return vocab.index(x)
     except (ValueError, TypeError):
@@ -46,7 +46,7 @@ def bin_next_event_user_history(
 class UserHistoryDataset(Dataset):  # type: ignore
     """Dataset for user histories."""
 
-    def __init__(self, histories_path: Path, definitionId_vocab: List[str]):
+    def __init__(self, histories_path: Path, definitionId_vocab: list[str]):
         """Initialize dataset."""
         self.histories = pd.read_parquet(histories_path).sort_index()
         self.sample_indexes = list(
@@ -57,18 +57,18 @@ class UserHistoryDataset(Dataset):  # type: ignore
     def __len__(self) -> int:
         return len(self.sample_indexes)
 
-    def __getitem__(self, idx: int) -> Tuple[Any, int]:
+    def __getitem__(self, idx: int) -> tuple[Any, int]:
         actions = self.histories.loc[[(self.sample_indexes[idx], "DefinitionId")]]
         times = self.histories.loc[[(self.sample_indexes[idx], "OccurredTime")]]
         times[times.columns] = times[times.columns].apply(pd.to_datetime)
 
-        historic_actions = np.apply_along_axis(
-            lambda x: embed_vocab(x, self.definitionId_vocab),
+        historic_actions = np.apply_along_axis(  # type: ignore
+            lambda x: embed_vocab(x, self.definitionId_vocab),  # type: ignore
             0,
             actions.loc[:, actions.columns != "NextEvent"].to_numpy(),
         )
         next_action = np.apply_along_axis(
-            lambda x: embed_vocab(x, self.definitionId_vocab),
+            lambda x: embed_vocab(x, self.definitionId_vocab),  # type: ignore
             0,
             actions.loc[:, actions.columns == "NextEvent"].to_numpy(),
         )[0]

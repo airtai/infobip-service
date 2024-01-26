@@ -1,11 +1,18 @@
-from infobip_service.load_dataset import bin_next_event_user_history, _bin_timedelta, UserHistoryDataset
-from infobip_service.preprocessing import processed_data_path
-from datetime import datetime, timedelta
-import pandas as pd
 import json
+from datetime import datetime, timedelta
+
+import pandas as pd
 import pytest
 
-user_history = pd.DataFrame({
+from infobip_service.load_dataset import (
+    UserHistoryDataset,
+    _bin_timedelta,
+    bin_next_event_user_history,
+)
+from infobip_service.preprocessing import processed_data_path
+
+user_history = pd.DataFrame(
+    {
         "AccountId": [12345, 12345, 12345],
         "OccurredTime": [
             "2023-07-10 13:27:00.123456",
@@ -14,8 +21,11 @@ user_history = pd.DataFrame({
         ],
         "DefinitionId": ["one", "one", "one"],
         "ApplicationId": [None, None, None],
-    }, index=pd.Index([1, 1, 1], name="PersonId"))
+    },
+    index=pd.Index([1, 1, 1], name="PersonId"),
+)
 user_history["OccurredTime"] = pd.to_datetime(user_history["OccurredTime"])
+
 
 def test_bin_timedelta():
     assert _bin_timedelta(timedelta(days=0)) == 0
@@ -27,21 +37,48 @@ def test_bin_timedelta():
 
 
 def test_bin_next_event_user_history():
-    assert bin_next_event_user_history(datetime(2023, 7, 10, 23, 59), t0=datetime(2023, 7, 10)) == 0 # 1 day to first event
-    assert bin_next_event_user_history(datetime(2023, 7, 11), t0=datetime(2023, 7, 10)) == 1 # 1.0000001 day to first event
-    assert bin_next_event_user_history(datetime(2023, 7, 13), t0=datetime(2023, 7, 10)) == 2 # 3 days to first event
-    assert bin_next_event_user_history(datetime(2023, 7, 17), t0=datetime(2023, 7, 10)) == 3 # 7 days to first event
-    assert bin_next_event_user_history(datetime(2023, 7, 25), t0=datetime(2023, 7, 10)) == 4 # 14 days to first event
-    assert bin_next_event_user_history(datetime(2023, 8, 7), t0=datetime(2023, 7, 10)) == 5 # 28 days to first event
-    assert bin_next_event_user_history(datetime(2023, 8, 11), t0=datetime(2023, 7, 10)) == 5 # 32 days to first event
-    assert bin_next_event_user_history(None, t0=datetime(2023, 7, 10)) == 5 # No next event
+    assert (
+        bin_next_event_user_history(
+            datetime(2023, 7, 10, 23, 59), t0=datetime(2023, 7, 10)
+        )
+        == 0
+    )  # 1 day to first event
+    assert (
+        bin_next_event_user_history(datetime(2023, 7, 11), t0=datetime(2023, 7, 10))
+        == 1
+    )  # 1.0000001 day to first event
+    assert (
+        bin_next_event_user_history(datetime(2023, 7, 13), t0=datetime(2023, 7, 10))
+        == 2
+    )  # 3 days to first event
+    assert (
+        bin_next_event_user_history(datetime(2023, 7, 17), t0=datetime(2023, 7, 10))
+        == 3
+    )  # 7 days to first event
+    assert (
+        bin_next_event_user_history(datetime(2023, 7, 25), t0=datetime(2023, 7, 10))
+        == 4
+    )  # 14 days to first event
+    assert (
+        bin_next_event_user_history(datetime(2023, 8, 7), t0=datetime(2023, 7, 10)) == 5
+    )  # 28 days to first event
+    assert (
+        bin_next_event_user_history(datetime(2023, 8, 11), t0=datetime(2023, 7, 10))
+        == 5
+    )  # 32 days to first event
+    assert (
+        bin_next_event_user_history(None, t0=datetime(2023, 7, 10)) == 5
+    )  # No next event
+
 
 @pytest.mark.skip(reason="Dataset not available on CI/CD")
 def test_train_dataset():
-    with open(processed_data_path/"DefinitionId_vocab.json", "rb") as f:
+    with open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
         vocab = json.load(f)
 
-    train_dataset = UserHistoryDataset(processed_data_path/"train_prepared.parquet", definitionId_vocab=vocab)
+    train_dataset = UserHistoryDataset(
+        processed_data_path / "train_prepared.parquet", definitionId_vocab=vocab
+    )
 
     for i in range(100):
         x, y = train_dataset[i]
@@ -49,12 +86,15 @@ def test_train_dataset():
         assert y >= 0
         assert y <= 5
 
+
 @pytest.mark.skip(reason="Dataset not available on CI/CD")
 def test_test_dataset():
-    with open(processed_data_path/"DefinitionId_vocab.json", "rb") as f:
+    with open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
         vocab = json.load(f)
 
-    test_dataset = UserHistoryDataset(processed_data_path/"test_prepared.parquet", definitionId_vocab=vocab)
+    test_dataset = UserHistoryDataset(
+        processed_data_path / "test_prepared.parquet", definitionId_vocab=vocab
+    )
 
     for i in range(100):
         x, y = test_dataset[i]
@@ -62,12 +102,15 @@ def test_test_dataset():
         assert y >= 0
         assert y <= 5
 
+
 @pytest.mark.skip(reason="Dataset not available on CI/CD")
 def test_val_dataset():
-    with open(processed_data_path/"DefinitionId_vocab.json", "rb") as f:
+    with open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
         vocab = json.load(f)
 
-    val_dataset = UserHistoryDataset(processed_data_path/"validation_prepared.parquet", definitionId_vocab=vocab)
+    val_dataset = UserHistoryDataset(
+        processed_data_path / "validation_prepared.parquet", definitionId_vocab=vocab
+    )
 
     for i in range(100):
         x, y = val_dataset[i]

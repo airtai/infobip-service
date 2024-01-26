@@ -1,5 +1,6 @@
 import math
-from typing import Any, Callable, Dict
+from collections.abc import Callable
+from typing import Any
 
 import torch
 from torch.nn import Linear
@@ -18,7 +19,7 @@ def expand_time_feature(x: torch.Tensor, period: str) -> float:
     return x % PERIODS_SECONDS[period]
 
 
-def expand_time_features(d: Dict[str, torch.Tensor]) -> Dict[str, float]:
+def expand_time_features(d: dict[str, torch.Tensor]) -> dict[str, float]:
     dd = {
         f"{name}_{period}": expand_time_feature(x, period)
         for name, x in d.items()
