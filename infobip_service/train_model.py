@@ -50,7 +50,9 @@ def _run_training_loop(
     return model
 
 
-def train_model(processed_data_path: Path) -> torch.nn.Module:
+def train_model(
+    processed_data_path: Path, epochs: int = 2, learning_rate: float = 0.001
+) -> torch.nn.Module:
     with Path.open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
         vocab = json.load(f)
 
@@ -80,8 +82,8 @@ def train_model(processed_data_path: Path) -> torch.nn.Module:
         model,
         datasets["train"],
         datasets["validation"],
-        epochs=2,
-        learning_rate=0.001,
+        epochs=epochs,
+        learning_rate=learning_rate,
         device="cuda" if torch.cuda.is_available() else "cpu",
     )
 
