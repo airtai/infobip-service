@@ -24,8 +24,8 @@ def test_get_paths(patch_envs):
         "input_data_path": Path(
             f"{downloading_root_path}/AccountId-{AccountId}/ApplicationId-{ApplicationId}/ModelId-{ModelId}/{dt}"
         ),
-        "pretraining_path": Path(
-            f"{training_root_path}/AccountId-{AccountId}/ApplicationId-{ApplicationId}/ModelId-{ModelId}/{dt}/TimeSeriesMaskedPretrainingProblem"
+        "preprocessing_path": Path(
+            f"{training_root_path}/AccountId-{AccountId}/ApplicationId-{ApplicationId}/ModelId-{ModelId}/{dt}/TimeSeriesMaskedPreprocessing"
         ),
         "training_path": Path(
             f"{training_root_path}/AccountId-{AccountId}/ApplicationId-{ApplicationId}/ModelId-{ModelId}/{dt}/TimeSeriesDownstreamDataChurn"
