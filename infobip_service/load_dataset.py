@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -33,7 +33,7 @@ def embed_vocab(x: str, vocab: list[str]) -> int:
 
 
 def bin_next_event_user_history(
-    user_history: Optional[datetime],
+    user_history: datetime | None,
     *,
     t0: datetime,
     timedelta_buckets: np.ndarray = timedelta_buckets,  # type: ignore

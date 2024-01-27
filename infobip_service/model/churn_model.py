@@ -101,6 +101,7 @@ class ChurnProbabilityModel(torch.nn.Module):
         churn_model: ChurnModel,
         time_to_churn: int = buckets[-1],
     ):
+        """Churn model initialization method."""
         super().__init__()
         self.time_to_churn = time_to_churn
         self.churn_model = churn_model
@@ -116,9 +117,8 @@ class ChurnProbabilityModel(torch.nn.Module):
             [event_probabilities, days_from_last_events.unsqueeze(-1)], axis=-1
         )
 
-        calculate_churn_for_row = lambda row: churn(
-            row[0:-1], row[-1], time_to_churn=self.time_to_churn
-        )
+        def calculate_churn_for_row(row: torch.Tensor) -> float:
+            return churn(row[0:-1], row[-1], time_to_churn=self.time_to_churn)
 
         if len(combined.shape) == 1:
             return torch.tensor(calculate_churn_for_row(combined))  # type: ignore

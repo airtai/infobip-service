@@ -8,6 +8,8 @@ from infobip_service.train_model import train_model
 
 
 class TimeSeriesDownstreamSolution:
+    """Time series downstream solution."""
+
     def __init__(
         self,
         raw_data_path: Path,
@@ -15,6 +17,7 @@ class TimeSeriesDownstreamSolution:
         epochs: int,
         learning_rate: float,
     ):
+        """Initialize downstream solution."""
         self.raw_data_path = raw_data_path
         self.epochs = epochs
         self.learning_rate = learning_rate
