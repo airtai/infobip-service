@@ -1,3 +1,4 @@
+import asyncio
 import random
 import shutil
 import ssl
@@ -12,12 +13,18 @@ from faststream import FastStream
 from faststream.kafka import KafkaBroker
 from faststream.security import SASLScram256
 
-from infobip_service.download import download_account_id_rows_as_parquet
+from infobip_service.download import (
+    download_account_id_rows_as_parquet,
+    get_count_for_account_id,
+)
 from infobip_service.kafka_server import (
     ModelMetrics,
     ModelTrainingRequest,
     Prediction,
     StartPrediction,
+    Tracker,
+    TrainingDataStatus,
+    TrainingModelStart,
     TrainingModelStatus,
 )
 from infobip_service.logger import get_logger, supress_timestamps
@@ -154,9 +161,9 @@ def custom_df_map_f(df: pd.DataFrame) -> pd.DataFrame:
 #     **kwargs: Any,
 # ) -> None:
 if not hasattr(broker, "premodels"):
-    broker.premodels: Dict[str, TimeSeriesMaskedPretrainingUNETSolution] = {}
+    broker.premodels: dict[str, TimeSeriesMaskedPretrainingUNETSolution] = {}
 if not hasattr(broker, "models"):
-    broker.models: Dict[str, TimeSeriesDownstreamSolution] = {}
+    broker.models: dict[str, TimeSeriesDownstreamSolution] = {}
 
 
 @broker.publisher(f"{username}_training_model_status")
@@ -203,7 +210,6 @@ async def pretrain(
     )
     input_data_path = paths["input_data_path"]
     pretraining_path = paths["pretraining_path"]
-    # todo: check that input_data_path exists
 
     training_model_status = TrainingModelStatus(
         AccountId=AccountId,
@@ -667,6 +673,87 @@ async def on_start_prediction(
     except Exception as e:
         logger.info(f"on_start_prediction({msg}): predictions failed - {e!s}")
         logger.info(f"on_start_prediction({msg}): predictions failed, moving on...")
+
+
+# Airt Service part
+
+# def add_process_start_training_data(
+#     app: FastKafka,
+#     *,
+#     username: str = "infobip",
+#     stop_on_no_change_interval: int = 60,
+#     abort_on_no_change_interval: int = 120,
+#     sleep_interval: int = 5,
+# ) -> None:
+
+sleep_interval = 5
+stop_on_no_change_interval = 60
+abort_on_no_change_interval = 120
+
+
+@broker.publisher(f"{username}_training_data_status")
+async def to_training_data_status(
+    training_data_status: TrainingDataStatus,
+) -> TrainingDataStatus:
+    print(f"to_training_data_status({training_data_status})")
+    return training_data_status
+
+@broker.publisher(f"{username}_training_model_start")
+async def to_training_model_start(
+    training_model_start: TrainingModelStart,
+) -> TrainingModelStart:
+    print(f"to_training_model_start({training_model_start})")
+    return training_model_start
+
+@broker.subscriber(
+        f"{username}_start_training_data",
+        auto_offset_reset="earliest",
+        group_id=training_group_id,
+)
+async def on_start_training_data(
+    msg: ModelTrainingRequest
+) -> None:
+    logger.info(msg, "on_start_training_data() starting...")
+
+    account_id = msg.AccountId
+    application_id = msg.ApplicationId
+    model_id = msg.ModelId
+    total_no_of_records = msg.total_no_of_records
+
+    tracker = Tracker(
+        limit=total_no_of_records,
+        timeout=stop_on_no_change_interval,
+        abort_after=abort_on_no_change_interval,
+    )
+
+    while not tracker.finished():
+        curr_count, timestamp = get_count_for_account_id(
+            account_id=account_id,
+        )
+        if curr_count is not None:
+            if tracker.update(curr_count):
+                training_data_status = TrainingDataStatus(
+                    no_of_records=curr_count, **msg.model_dump()
+                )
+                await to_training_data_status(training_data_status)
+        else:
+            await logger.warning(
+                msg,
+                "on_start_training_data(): no data yet received in the database.",
+            )
+
+        await asyncio.sleep(sleep_interval)
+
+    if tracker.aborted():
+        await logger.error(msg, "on_start_training_data(): data retrieval aborted!")
+    else:
+        # trigger model training start
+        training_model_start = TrainingModelStart(
+            no_of_records=curr_count, **msg.model_dump()
+        )
+        await to_training_model_start(training_model_start)
+
+        await logger.info(msg, "on_start_training_data(): finished")
 
 
 app = FastStream(broker=broker)
