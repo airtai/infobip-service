@@ -20,7 +20,7 @@ COPY infobip_service infobip_service
 COPY pyproject.toml scheduler_requirements.txt scripts/start_service.sh README.md ./
 
 # Install requirements
-RUN pip install --no-compile --no-cache-dir -e "." && rm -rf /root/.cache/pip
+RUN pip install --no-compile --no-cache-dir -e ".[dev]" && rm -rf /root/.cache/pip
 
 # Rocketry doesn't supports pydantic v2
 #RUN python3 -m venv venv
