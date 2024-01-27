@@ -319,7 +319,7 @@ def _get_count_for_account_id(
         logger.info(f"Getting count with query={query}")
 
         # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
-        result = connection.execute(query).fetchall()
+        result = connection.execute(query).fetchall()  # type: ignore [no-untyped-call]
 
         if len(result) == 0:
             return (None, None)
@@ -343,4 +343,4 @@ def get_count_for_account_id(
         Count for the given account id
     """
     db_params = get_clickhouse_params_from_env_vars()
-    return _get_count_for_account_id(account_id=account_id, **db_params)
+    return _get_count_for_account_id(account_id=account_id, **db_params)  # type: ignore [arg-type]

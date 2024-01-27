@@ -162,7 +162,7 @@ def custom_df_map_f(df: pd.DataFrame) -> pd.DataFrame:
 # ) -> None:
 
 if not hasattr(broker, "models"):
-    broker.models: dict[str, torch.nn.Module] = {}
+    broker.models: dict[tuple[int, str], torch.nn.Module] = {}  # type: ignore
 
 
 @broker.publisher(f"{username}_training_model_status")
@@ -280,11 +280,11 @@ async def train(
     )
     await to_training_model_status(training_model_status)
 
-    if training_path.exists() and (AccountId, ModelId) in broker.models:
+    if training_path.exists() and (AccountId, ModelId) in broker.models:  # type: ignore [attr-defined]
         logger.info(
             f"on_training_model_status({msg})->train(): path '{training_path}' exists, moving on..."
         )
-        trained_model = broker.models[(AccountId, ModelId)]
+        trained_model = broker.models[(AccountId, ModelId)]  # type: ignore [attr-defined]
     else:
         if training_path.exists():
             logger.info(
@@ -311,7 +311,7 @@ async def train(
             )
             raise e
 
-        broker.models[(AccountId, ModelId)] = trained_model
+        broker.models[(AccountId, ModelId)] = trained_model  # type: ignore [attr-defined]
 
     training_model_status = TrainingModelStatus(
         AccountId=AccountId,
@@ -346,7 +346,7 @@ async def train(
         AccountId=AccountId,
         ApplicationId=ApplicationId,
         ModelId=ModelId,
-        task_type="churn",
+        task_type="churn",  # type: ignore [arg-type]
     )
     await to_start_prediction(start_prediction)
     logger.info(
@@ -628,7 +628,7 @@ async def on_start_training_data(msg: ModelTrainingRequest) -> None:
                 )
                 await to_training_data_status(training_data_status)
         else:
-            await logger.warning(
+            logger.warning(
                 msg,
                 "on_start_training_data(): no data yet received in the database.",
             )
@@ -636,15 +636,16 @@ async def on_start_training_data(msg: ModelTrainingRequest) -> None:
         await asyncio.sleep(sleep_interval)
 
     if tracker.aborted():
-        await logger.error(msg, "on_start_training_data(): data retrieval aborted!")
+        logger.error(msg, "on_start_training_data(): data retrieval aborted!")
     else:
         # trigger model training start
         training_model_start = TrainingModelStart(
-            no_of_records=curr_count, **msg.model_dump()
+            no_of_records=curr_count,  # type: ignore [arg-type]
+            **msg.model_dump(),
         )
         await to_training_model_start(training_model_start)
 
-        await logger.info(msg, "on_start_training_data(): finished")
+        logger.info(msg, "on_start_training_data(): finished")
 
 
 app = FastStream(broker=broker)

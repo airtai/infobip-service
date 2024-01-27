@@ -344,7 +344,7 @@ class ModelMetrics(BaseModel):
     if PYDANTIC_V2:
 
         @field_serializer("timestamp")
-        def serialize_timestamp(self, timestamp: datetime, _info):
+        def serialize_timestamp(self, timestamp: datetime, _info: Any) -> str:
             return timestamp.strftime("%Y-%m-%dT%H:%M:%S")
 
 
@@ -389,5 +389,5 @@ class Prediction(BaseModel):
     if PYDANTIC_V2:
 
         @field_serializer("prediction_time")
-        def serialize_timestamp(self, timestamp: datetime, _info):
+        def serialize_timestamp(self, timestamp: datetime, _info: Any) -> str:
             return timestamp.strftime("%Y-%m-%dT%H:%M:%S")
