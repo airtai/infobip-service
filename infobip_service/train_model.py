@@ -21,7 +21,7 @@ def _run_training_loop(
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = torch.nn.CrossEntropyLoss()
-    for epoch in range(epochs):
+    for _ in range(epochs):
         model.train()
         for batch in tqdm(train_dataset):
             optimizer.zero_grad()
@@ -44,7 +44,7 @@ def _run_training_loop(
                 loss = loss_fn(y_pred, y)
                 total_loss += loss.item()
 
-        average_loss = total_loss / len(validation_dataset)
+        # average_loss = total_loss / len(validation_dataset)
         # print(f"Epoch: {epoch}, Average Validation Loss: {average_loss}")
 
     return model
