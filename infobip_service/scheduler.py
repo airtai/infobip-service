@@ -64,7 +64,7 @@ async def start_daily_prediction() -> None:
                 task_type="churn",  # type: ignore
             )
             msg = (start_prediction.json()).encode("utf-8")
-            logger.info(f"Sending daily retraining for {msg=}")
+            logger.info(f"Sending daily prediction for {msg=}")
             await producer.send_and_wait("infobip_start_prediction", msg)
     finally:
         await producer.stop()
