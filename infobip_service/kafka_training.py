@@ -605,7 +605,7 @@ async def to_training_model_start(
     group_id=training_group_id,
 )
 async def on_start_training_data(msg: ModelTrainingRequest) -> None:
-    logger.info(msg, "on_start_training_data() starting...")
+    logger.info(f"on_start_training_data({msg=}) starting...")
 
     account_id = msg.AccountId
     total_no_of_records = msg.total_no_of_records
@@ -628,14 +628,13 @@ async def on_start_training_data(msg: ModelTrainingRequest) -> None:
                 await to_training_data_status(training_data_status)
         else:
             logger.warning(
-                msg,
-                "on_start_training_data(): no data yet received in the database.",
+                f"on_start_training_data({msg=}): no data yet received in the database.",
             )
 
         await asyncio.sleep(sleep_interval)
 
     if tracker.aborted():
-        logger.error(msg, "on_start_training_data(): data retrieval aborted!")
+        logger.error(f"on_start_training_data({msg=}): data retrieval aborted!")
     else:
         # trigger model training start
         training_model_start = TrainingModelStart(
@@ -644,7 +643,7 @@ async def on_start_training_data(msg: ModelTrainingRequest) -> None:
         )
         await to_training_model_start(training_model_start)
 
-        logger.info(msg, "on_start_training_data(): finished")
+        logger.info(f"on_start_training_data({msg=}): finished")
 
 
 app = FastStream(broker=broker)
