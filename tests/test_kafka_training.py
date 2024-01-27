@@ -7,9 +7,9 @@ def test_get_paths(patch_envs):
 
     downloading_root_path = Path("downloading_test_path")
     training_root_path = Path("training_test_path")
-    AccountId = 317238
-    ApplicationId = ""
-    ModelId = "20060"
+    AccountId = 317238  # noqa: N806
+    ApplicationId = ""  # noqa: N806
+    ModelId = "20060"  # noqa: N806
     dt = datetime.now().date().isoformat()
 
     actual = get_paths(

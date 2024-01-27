@@ -349,6 +349,8 @@ class ModelMetrics(BaseModel):
 
 
 class Prediction(BaseModel):
+    """Prediction."""
+
     AccountId: NonNegativeInt = Field(
         ..., examples=[202020], description="ID of an account"
     )

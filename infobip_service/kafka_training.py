@@ -6,7 +6,6 @@ import traceback
 from datetime import datetime
 from os import environ
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import pandas as pd
 import torch
@@ -15,7 +14,6 @@ from faststream.kafka import KafkaBroker
 from faststream.security import SASLScram256
 
 from infobip_service.download import (
-    download_account_id_rows_as_parquet,
     get_count_for_account_id,
 )
 from infobip_service.kafka_server import (
@@ -136,12 +134,12 @@ def get_paths(
         / "TimeSeriesDownstreamPrediction"
     )
 
-    return dict(
-        input_data_path=input_data_path,
-        preprocessing_path=preprocessing_path,
-        training_path=training_path,
-        prediction_path=prediction_path,
-    )
+    return {
+        "input_data_path": input_data_path,
+        "preprocessing_path": preprocessing_path,
+        "training_path": training_path,
+        "prediction_path": prediction_path,
+    }
 
 
 def custom_df_map_f(df: pd.DataFrame) -> pd.DataFrame:
@@ -193,14 +191,12 @@ async def to_start_prediction(
     return start_prediction
 
 
-async def preprocess(
-    msg: TrainingModelStatus, broker: KafkaBroker = broker
-) -> Path:
+async def preprocess(msg: TrainingModelStatus, broker: KafkaBroker = broker) -> Path:
     # processing message
 
-    AccountId = msg.AccountId
-    ApplicationId = msg.ApplicationId
-    ModelId = msg.ModelId
+    AccountId = msg.AccountId  # noqa: N806
+    ApplicationId = msg.ApplicationId  # noqa: N806
+    ModelId = msg.ModelId  # noqa: N806
 
     paths = get_paths(
         downloading_root_path=downloading_root_path,
@@ -260,9 +256,9 @@ async def train(
     msg: TrainingModelStatus,
     broker: KafkaBroker = broker,
 ) -> None:
-    AccountId = msg.AccountId
-    ApplicationId = msg.ApplicationId
-    ModelId = msg.ModelId
+    AccountId = msg.AccountId  # noqa: N806
+    ApplicationId = msg.ApplicationId  # noqa: N806
+    ModelId = msg.ModelId  # noqa: N806
 
     paths = get_paths(
         downloading_root_path=downloading_root_path,
@@ -271,7 +267,6 @@ async def train(
         ApplicationId=ApplicationId,
         ModelId=ModelId,
     )
-    input_data_path = paths["input_data_path"]
     training_path = paths["training_path"]
     preprocessing_path = paths["preprocessing_path"]
 
@@ -306,7 +301,9 @@ async def train(
             f"on_training_model_status({msg})->train(): training data for {downstream_epochs} epochs..."
         )
         try:
-            trained_model = train_model(processed_data_path=preprocessing_path, epochs=downstream_epochs)
+            trained_model = train_model(
+                processed_data_path=preprocessing_path, epochs=downstream_epochs
+            )
 
         except Exception as e:
             logger.error(
@@ -396,8 +393,8 @@ async def on_training_model_status(
             )
             return
 
-        preprocessing_path = await preprocess(msg)
-        await train(msg, pretrained_unet=pretrained_unet)
+        await preprocess(msg)
+        await train(msg)
 
         logger.info(f"on_training_model_status({msg}) SUCCESSFULLY finished.")
     except Exception as e:
@@ -591,29 +588,27 @@ abort_on_no_change_interval = 120
 async def to_training_data_status(
     training_data_status: TrainingDataStatus,
 ) -> TrainingDataStatus:
-    print(f"to_training_data_status({training_data_status})")
+    logger.info(f"to_training_data_status({training_data_status})")
     return training_data_status
+
 
 @broker.publisher(f"{username}_training_model_start")
 async def to_training_model_start(
     training_model_start: TrainingModelStart,
 ) -> TrainingModelStart:
-    print(f"to_training_model_start({training_model_start})")
+    logger.info(f"to_training_model_start({training_model_start})")
     return training_model_start
 
+
 @broker.subscriber(
-        f"{username}_start_training_data",
-        auto_offset_reset="earliest",
-        group_id=training_group_id,
+    f"{username}_start_training_data",
+    auto_offset_reset="earliest",
+    group_id=training_group_id,
 )
-async def on_start_training_data(
-    msg: ModelTrainingRequest
-) -> None:
+async def on_start_training_data(msg: ModelTrainingRequest) -> None:
     logger.info(msg, "on_start_training_data() starting...")
 
     account_id = msg.AccountId
-    application_id = msg.ApplicationId
-    model_id = msg.ModelId
     total_no_of_records = msg.total_no_of_records
 
     tracker = Tracker(

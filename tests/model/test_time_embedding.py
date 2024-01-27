@@ -30,7 +30,6 @@ def test_expand_time_features():
 
     actual = expand_time_features(d)
     assert len(actual.keys()) == 2 * (len(PERIODS))
-    actual
 
 
 def test_create_period_normalization():

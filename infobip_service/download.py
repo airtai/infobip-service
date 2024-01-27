@@ -343,7 +343,4 @@ def get_count_for_account_id(
         Count for the given account id
     """
     db_params = get_clickhouse_params_from_env_vars()
-    return _get_count_for_account_id(
-        account_id=account_id,
-        **db_params
-    )
+    return _get_count_for_account_id(account_id=account_id, **db_params)
