@@ -64,7 +64,7 @@ def train_model(
             UserHistoryDataset(
                 processed_data_path / f"{k}_prepared.parquet", definitionId_vocab=vocab
             ),
-            batch_size=16,
+            batch_size=1,
             num_workers=32,
             pin_memory=True,
         )

@@ -64,7 +64,7 @@ class ChurnModel(torch.nn.Module):
         y = self.linear2(y)
         y = self.softmax(y)
 
-        return y.squeeze()
+        return y.squeeze(-2)
 
 
 def interpolate_cdf_from_pdf(

@@ -50,7 +50,10 @@ class UserHistoryDataset(Dataset):  # type: ignore
         """Initialize dataset."""
         self.histories = pd.read_parquet(histories_path).sort_index()
         self.sample_indexes = list(
-            {sample_indexes for sample_indexes, _ in self.histories.index}
+            {  # noqa
+                index
+                for index in self.histories.index.get_level_values("PersonId").to_list()
+            }
         )
         self.definitionId_vocab = definitionId_vocab
 
@@ -58,8 +61,12 @@ class UserHistoryDataset(Dataset):  # type: ignore
         return len(self.sample_indexes)
 
     def __getitem__(self, idx: int) -> tuple[Any, int]:
-        actions = self.histories.loc[[(self.sample_indexes[idx], "DefinitionId")]]
-        times = self.histories.loc[[(self.sample_indexes[idx], "OccurredTime")]]
+        actions = self.histories.query(
+            f'PersonId == "{self.sample_indexes[idx]}" & level_1 == "DefinitionId"'
+        )
+        times = self.histories.query(
+            f'PersonId == "{self.sample_indexes[idx]}" & level_1 == "OccurredTime"'
+        ).copy()
         times[times.columns] = times[times.columns].apply(pd.to_datetime)
 
         historic_actions = np.apply_along_axis(  # type: ignore
