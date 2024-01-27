@@ -164,7 +164,10 @@ def create_user_histories(
 def random_date(start: datetime, end: datetime) -> datetime:
     delta = end - start
     int_delta = (delta.days * 24 * 60 * 60) + delta.seconds
-    random_second = randrange(int_delta)  # nosec
+    try:
+        random_second = randrange(int_delta)  # nosec
+    except ValueError:
+        return end
     return start + timedelta(seconds=random_second)
 
 
@@ -196,7 +199,7 @@ def sample_user_histories(
     while num_samples_to_go > 0:
         t0 = random_date(min_time, max_time)
         filtered_index = user_histories[
-            user_histories["OccurredTime"] < t0
+            user_histories["OccurredTime"] <= t0
         ].index.unique()
         if len(filtered_index) == 0:
             continue
@@ -270,7 +273,7 @@ def prepare_ddf(ddf: dd.DataFrame, *, history_size: int) -> dd.DataFrame:  # typ
 
 
 def preprocess_train_validation(
-    raw_data_path: Path, preprocessed_data_path: Path
+    raw_data_path: Path, processed_data_path: Path
 ) -> tuple[dd.DataFrame, dd.DataFrame]:  # type: ignore
     # Read raw data
     print("Reading raw data...")  # noqa: T201
