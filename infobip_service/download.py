@@ -1,6 +1,7 @@
 import logging
 import tempfile
 from contextlib import contextmanager
+from datetime import datetime
 from os import environ
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,11 @@ from urllib.parse import quote_plus as urlquote
 import dask.dataframe as dd
 import pandas as pd
 from sqlalchemy.engine import Connection, create_engine
+
+from infobip_service.logger import get_logger, supress_timestamps
+
+supress_timestamps(False)
+logger = get_logger(__name__)
 
 raw_data_path = Path() / ".." / "data" / "raw"
 
@@ -264,3 +270,77 @@ def get_unique_account_ids_model_ids() -> list[dict[str, int]]:
     # Replace infobip_data with infobip_start_training_data for table param
     db_params["table"] = "infobip_start_training_data"
     return _get_unique_account_ids_model_ids(**db_params)  # type: ignore
+
+
+def _get_count_for_account_id(
+    account_id: int | str,
+    username: str,
+    password: str,
+    host: str,
+    port: int,
+    database: str,
+    table: str,
+    protocol: str,
+) -> tuple[int | None, datetime | None]:
+    """Function to get count for the given account ids from given table.
+
+    Args:
+        account_id: account id
+        username: Username of clickhouse database
+        password: Password of clickhouse database
+        host: Host of clickhouse database
+        port: Port of clickhouse database
+        table: Table of clickhouse database
+        database: Database to use
+        protocol: Protocol to connect to clickhouse (native/http)
+
+    Returns:
+        A pair containing count and timestamp from the db
+    """
+    with get_clickhouse_connection(  # type: ignore
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        database=database,
+        table=table,
+        protocol=protocol,
+    ) as connection:
+        if not type(connection) == Connection:
+            raise ValueError(f"{type(connection)=} != Connection")
+
+        # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+        query = (
+            f"SELECT AccountId, count() as count, now() as now FROM {database}.{table} "  # nosec B608
+            + f"WHERE AccountId={account_id} "
+            + "GROUP BY AccountId "
+        )
+
+        logger.info(f"Getting count with query={query}")
+
+        # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+        result = connection.execute(query).fetchall()  # type: ignore
+
+        if len(result) == 0:
+            return (None, None)
+        elif len(result) == 1:
+            return (result[0][-2], result[0][-1])
+        else:
+            raise RuntimeError(
+                f"More than one result returned from the database: {result}"
+            )
+
+
+def get_count_for_account_id(
+    account_id: int | str,
+) -> tuple[int | None, datetime | None]:
+    """Get count of all rows for given account ids from clickhouse table.
+
+    Args:
+        account_id: Account id
+
+    Returns:
+        Count for the given account id
+    """
+    db_params = get_clickhouse_params_from_env_vars()
+    return _get_count_for_account_id(account_id=account_id, **db_params)  # type: ignore [arg-type]
