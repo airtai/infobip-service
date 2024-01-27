@@ -191,7 +191,7 @@ async def to_start_prediction(
     return start_prediction
 
 
-async def preprocess(msg: TrainingModelStatus, broker: KafkaBroker = broker) -> Path:
+async def preprocess(msg: TrainingModelStatus) -> Path:
     # processing message
 
     AccountId = msg.AccountId  # noqa: N806
@@ -361,7 +361,6 @@ async def train(
 )
 async def on_training_model_status(
     msg: TrainingModelStatus,
-    broker: KafkaBroker = broker,
     AccountId: int | None = None,
     ModelId: int | str | None = None,
     skip_all_requests: bool = False,
