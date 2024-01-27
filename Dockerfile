@@ -2,6 +2,7 @@ ARG BASE_IMAGE=ubuntu:22.04
 
 FROM $BASE_IMAGE
 
+ENV PYTHONDONTWRITEBYTECODE=1
 
 SHELL ["/bin/bash", "-c"]
 
@@ -19,7 +20,7 @@ COPY infobip_service infobip_service
 COPY pyproject.toml scheduler_requirements.txt scripts/start_service.sh README.md ./
 
 # Install requirements
-RUN pip install --no-cache-dir -e ".[dev]"
+RUN pip install --no-compile --no-cache-dir -e "." && rm -rf /root/.cache/pip
 
 # Rocketry doesn't supports pydantic v2
 #RUN python3 -m venv venv
