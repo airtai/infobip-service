@@ -22,8 +22,8 @@ COPY pyproject.toml scheduler_requirements.txt scripts/start_service.sh README.m
 RUN pip install --no-cache-dir -e ".[dev]"
 
 # Rocketry doesn't supports pydantic v2
-RUN python3 -m venv venv
-RUN venv/bin/pip install --no-cache-dir -e ".[dev]" && venv/bin/pip install --no-cache-dir -r scheduler_requirements.txt
+#RUN python3 -m venv venv
+#RUN venv/bin/pip install --no-cache-dir -e ".[dev]" && venv/bin/pip install --no-cache-dir -r scheduler_requirements.txt
 
 ENTRYPOINT []
 CMD [ "/usr/bin/bash", "-c", "./start_service.sh" ]

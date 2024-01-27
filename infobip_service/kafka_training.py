@@ -624,7 +624,7 @@ async def on_start_training_data(msg: ModelTrainingRequest) -> None:
         if curr_count is not None:
             if tracker.update(curr_count):
                 training_data_status = TrainingDataStatus(
-                    no_of_records=curr_count, **msg.model_dump()
+                    no_of_records=curr_count, **msg.dict()
                 )
                 await to_training_data_status(training_data_status)
         else:
@@ -641,7 +641,7 @@ async def on_start_training_data(msg: ModelTrainingRequest) -> None:
         # trigger model training start
         training_model_start = TrainingModelStart(
             no_of_records=curr_count,  # type: ignore [arg-type]
-            **msg.model_dump(),
+            **msg.dict(),
         )
         await to_training_model_start(training_model_start)
 
