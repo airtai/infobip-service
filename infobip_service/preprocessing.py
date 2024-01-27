@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from random import choice, randrange
@@ -429,15 +430,60 @@ def preprocess_test(raw_data_path: Path, processed_data_path: Path) -> dd.DataFr
     return data_prepared
 
 
-if __name__ == "__main__":
+def calculate_vocab(
+    ddf: dd.DataFrame,  # type: ignore
+    *,
+    column: str,
+    processed_data_path: Path,
+) -> None:
+    vocabulary = list(ddf[column].unique().compute())
+    with Path.open(processed_data_path / f"{column}_vocab.json", "w") as f:
+        json.dump(vocabulary, f)
+
+
+def calculate_time_mean_std(
+    ddf: dd.DataFrame,  # type: ignore
+    *,
+    processed_data_path: Path,
+) -> None:
+    time_mean, time_std = (
+        ddf["OccurredTime"].compute().mean(),
+        ddf["OccurredTime"].std().compute(),
+    )
+
+    time_stats = {
+        "mean": int(time_mean.timestamp()),
+        "std": int(time_std.total_seconds()),
+    }
+
+    with Path.open(processed_data_path / "time_stats.json", "w") as f:
+        json.dump(time_stats, f)
+
+
+def preprocess_dataset(raw_data_path: Path, processed_data_path: Path) -> None:
     cluster = LocalCluster()  # type: ignore
     client = Client(cluster)  # type: ignore
 
     print(client)  # noqa: T201
 
+    processed_data_path.mkdir(exist_ok=True)
+
     try:
+        calculate_vocab(
+            dd.read_parquet(raw_data_path),  # type: ignore
+            column="DefinitionId",
+            processed_data_path=processed_data_path,
+        )
+        calculate_time_mean_std(
+            dd.read_parquet(raw_data_path),  # type: ignore
+            processed_data_path=processed_data_path,
+        )
         preprocess_test(raw_data_path, processed_data_path)
         preprocess_train_validation(raw_data_path, processed_data_path)
     finally:
         client.close()  # type: ignore
         cluster.close()  # type: ignore
+
+
+if __name__ == "__main__":
+    preprocess_dataset(raw_data_path, processed_data_path)
