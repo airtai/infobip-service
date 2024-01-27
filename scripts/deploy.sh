@@ -62,7 +62,7 @@ sshpass -p "$SSH_PASSWORD" scp -P 13402 -o StrictHostKeyChecking=no .env "$SSH_U
 
 echo "INFO: pulling docker images"
 sshpass -p "$SSH_PASSWORD" ssh -p 13402 -o StrictHostKeyChecking=no "$SSH_USER"@"$DOMAIN" "echo $GITHUB_PASSWORD | docker login -u '$GITHUB_USERNAME' --password-stdin '$CI_REGISTRY'" # nosemgrep
-sshpass -p "$SSH_PASSWORD" ssh -p 13402 -o StrictHostKeyChecking=no "$SSH_USER"@"$DOMAIN" "docker pull '$CI_REGISTRY_IMAGE':'$TAG'" # nosemgrep
+sshpass -p "$SSH_PASSWORD" ssh -p 13402 -o ServerAliveInterval=600 -o StrictHostKeyChecking=no "$SSH_USER"@"$DOMAIN" "docker pull '$CI_REGISTRY_IMAGE':'$TAG'" # nosemgrep
 sleep 10
 
 echo "Deleting old images"
