@@ -26,7 +26,8 @@ logger.info(f"{downloading_group_id=}")
 
 root_path = Path(environ.get("ROOT_PATH")) if environ.get("ROOT_PATH") else None  # type: ignore [arg-type]
 if root_path is None:
-    root_path = Path() / downloading_group_id
+    root_path = Path()
+root_path = root_path / downloading_group_id
 
 kwargs = {
     "request_timeout_ms": 120_000,
