@@ -366,10 +366,10 @@ async def train(
 )
 async def on_training_model_status(
     msg: TrainingModelStatus,
-    AccountId: int | None = None,
-    ModelId: int | str | None = None,
-    skip_all_requests: bool = False,
 ) -> None:
+    AccountId: int | None = None  # noqa: N806
+    ModelId: int | str | None = None  # noqa: N806
+    skip_all_requests: bool = False
     try:
         logger.info(f"on_training_model_status({msg}) started")
 
@@ -447,9 +447,9 @@ async def to_prediction(
 )
 async def on_start_prediction(
     msg: StartPrediction,
-    skip_all_requests: bool = False,
 ) -> None:
     global prediction
+    skip_all_requests: bool = False
     try:
         if skip_all_requests:
             logger.info(
