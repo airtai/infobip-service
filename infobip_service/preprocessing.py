@@ -10,6 +10,10 @@ import pandas as pd
 from dask.distributed import Client, LocalCluster
 
 from infobip_service.download import raw_data_path
+from infobip_service.logger import get_logger, supress_timestamps
+
+supress_timestamps(False)
+logger = get_logger(__name__)
 
 processed_data_path = Path() / ".." / "data" / "processed"
 
@@ -464,28 +468,36 @@ def calculate_time_mean_std(
 
 
 def preprocess_dataset(raw_data_path: Path, processed_data_path: Path) -> None:
+    logger.info("Starting preprocessing...")
     cluster = LocalCluster()  # type: ignore
     client = Client(cluster)  # type: ignore
+    logger.info("Local cluster and client started.")
 
     print(client)  # noqa: T201
 
     processed_data_path.mkdir(exist_ok=True)
+    logger.info("Created processed data path.")
 
     try:
+        logger.info("Calculating vocab...")
         calculate_vocab(
             dd.read_parquet(raw_data_path),  # type: ignore
             column="DefinitionId",
             processed_data_path=processed_data_path,
         )
+        logger.info("Calculating time mean and std...")
         calculate_time_mean_std(
             dd.read_parquet(raw_data_path),  # type: ignore
             processed_data_path=processed_data_path,
         )
+        logger.info("Preprocessing test data...")
         preprocess_test(raw_data_path, processed_data_path)
+        logger.info("Preprocessing train/validation data...")
         preprocess_train_validation(raw_data_path, processed_data_path)
     finally:
         client.close()  # type: ignore
         cluster.close()  # type: ignore
+    logger.info("Preprocessing done.")
 
 
 if __name__ == "__main__":
