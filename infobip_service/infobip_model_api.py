@@ -53,8 +53,9 @@ class TimeSeriesDownstreamSolution:
         self.processed_data_path = processed_data_path
         self.model = None
 
-    def train(self) -> "TimeSeriesDownstreamSolution":
-        preprocess_dataset(self.raw_data_path, self.processed_data_path)
+    def train(self, skip_preprocess: bool = False) -> "TimeSeriesDownstreamSolution":
+        if not skip_preprocess:
+            preprocess_dataset(self.raw_data_path, self.processed_data_path)
         self.model = train_model(  # type: ignore
             self.processed_data_path, self.epochs, self.learning_rate
         ).cpu()
@@ -64,7 +65,7 @@ class TimeSeriesDownstreamSolution:
         self,
         prediction_inputs_path: Path,
         t0: datetime = datetime.now(),  # noqa
-    ) -> ChurnProbabilityModel:
+    ) -> pd.DataFrame:
         with Path.open(self.processed_data_path / "DefinitionId_vocab.json", "rb") as f:
             vocab = json.load(f)
 
