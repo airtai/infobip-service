@@ -245,13 +245,14 @@ def prepare_data(
     max_time: datetime,
     history_size: int,
 ) -> pd.DataFrame:
+    logger.info("Preparing meta for sampling user histories")
     meta = sample_user_histories(
         ddf.head(2, npartitions=-1),
         min_time=min_time,
         max_time=max_time,
         history_size=history_size,
     )
-
+    logger.info("Sampling user histories")
     sampled_data = ddf.map_partitions(
         sample_user_histories,
         min_time=min_time,
@@ -259,7 +260,7 @@ def prepare_data(
         history_size=history_size,
         meta=meta,
     )
-
+    logger.info("User histories sampled")
     return sampled_data
 
 
