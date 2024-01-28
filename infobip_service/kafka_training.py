@@ -166,30 +166,32 @@ def custom_df_map_f(df: pd.DataFrame) -> pd.DataFrame:
 models: dict[tuple[int, str], TimeSeriesDownstreamSolution] = {}  # type: ignore
 
 
-@broker.publisher(f"{username}_training_model_status")
+# @broker.publisher(f"{username}_training_model_status")
 async def to_training_model_status(
     training_model_status: TrainingModelStatus,
-) -> TrainingModelStatus:
+) -> None:
     logger.info(f"to_training_model_status({training_model_status})")
-    return training_model_status
+    await broker.publish(
+        training_model_status, topic=f"{username}_training_model_status"
+    )
 
 
-@broker.publisher(f"{username}_model_metrics")
+# @broker.publisher(f"{username}_model_metrics")
 async def to_model_metrics(
     model_metrics: ModelMetrics,
-) -> ModelMetrics:
+) -> None:
     logger.info(f"to_model_metrics({model_metrics})")
-    return model_metrics
+    await broker.publish(model_metrics, topic=f"{username}_model_metrics")
 
 
-@broker.publisher(f"{username}_start_prediction")
+# @broker.publisher(f"{username}_start_prediction")
 async def to_start_prediction(
     start_prediction: StartPrediction,
-) -> StartPrediction:
+) -> None:
     logger.info("*" * 100)
     logger.info(f"to_start_prediction({start_prediction})")
     logger.info("*" * 100)
-    return start_prediction
+    await broker.publish(start_prediction, topic=f"{username}_start_prediction")
 
 
 async def preprocess(msg: TrainingModelStatus) -> Path:
@@ -424,20 +426,20 @@ prediction: pd.DataFrame | None = None
 # ) -> None:
 
 
-@broker.publisher(f"{username}_start_training_data")
+# @broker.publisher(f"{username}_start_training_data")
 async def to_start_training_data(
     request: ModelTrainingRequest,
-) -> ModelTrainingRequest:
+) -> None:
     logger.info(f"to_start_training_data({request})")
-    return request
+    await broker.publish(request, topic=f"{username}_start_training_data")
 
 
-@broker.publisher(f"{username}_prediction")
+# @broker.publisher(f"{username}_prediction")
 async def to_prediction(
     prediction: Prediction,
-) -> Prediction:
+) -> None:
     #         logger.info(f"to_prediction({prediction})")
-    return prediction
+    await broker.publish(prediction, topic=f"{username}_prediction")
 
 
 @broker.subscriber(
@@ -571,20 +573,20 @@ stop_on_no_change_interval = 60
 abort_on_no_change_interval = 120
 
 
-@broker.publisher(f"{username}_training_data_status")
+# @broker.publisher(f"{username}_training_data_status")
 async def to_training_data_status(
     training_data_status: TrainingDataStatus,
-) -> TrainingDataStatus:
+) -> None:
     logger.info(f"to_training_data_status({training_data_status})")
-    return training_data_status
+    await broker.publish(training_data_status, topic=f"{username}_training_data_status")
 
 
-@broker.publisher(f"{username}_training_model_start")
+# @broker.publisher(f"{username}_training_model_start")
 async def to_training_model_start(
     training_model_start: TrainingModelStart,
-) -> TrainingModelStart:
+) -> None:
     logger.info(f"to_training_model_start({training_model_start})")
-    return training_model_start
+    await broker.publish(training_model_start, topic=f"{username}_training_model_start")
 
 
 @broker.subscriber(

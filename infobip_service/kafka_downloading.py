@@ -54,12 +54,14 @@ broker = KafkaBroker(bootstrap_servers=bootstrap_servers, **kwargs)  # type: ign
 username = environ.get("USERNAME", "infobip")
 
 
-@broker.publisher(f"{username}_training_model_status")
+# @broker.publisher(f"{username}_training_model_status")
 async def to_training_model_status(
     training_model_status: TrainingModelStatus,
-) -> TrainingModelStatus:
+) -> None:
     logger.info(f"to_training_model_status({training_model_status})")
-    return training_model_status
+    await broker.publish(
+        training_model_status, topic=f"{username}_training_model_status"
+    )
 
 
 @broker.subscriber(
