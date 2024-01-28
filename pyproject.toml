@@ -101,9 +101,8 @@ dev = [
     "detect-secrets==1.4.0",
     "dask[diagnostics, distributed]>=2023.5.0",
     "pandas>=2.0.0",
-    "SQLAlchemy==1.4.41",
-    "clickhouse-sqlalchemy==0.2.3",
-    "clickhouse-driver[lz4]==0.2.5",
+    "sqlalchemy>=2.0.25",
+    "clickhouse-sqlalchemy>=0.3.0",
     "pyarrow>=14.0.2",
     "matplotlib>=3.7.0",
 ]
