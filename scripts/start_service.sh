@@ -11,7 +11,7 @@ faststream run --workers $NUM_WORKERS infobip_service.kafka_downloading:app &> .
 
 faststream run --workers $NUM_WORKERS infobip_service.kafka_training:app &> ./training.log & 
 
-venv/bin/python -m infobip_service.scheduler &> ./scheduler.log & 
+python3 -m infobip_service.scheduler &> ./scheduler.log & 
 
 # tail -f downloading.log
 

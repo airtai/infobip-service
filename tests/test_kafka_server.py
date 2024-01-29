@@ -32,8 +32,8 @@ def test_log_message():
         original_message=original_message,
     )
 
-    actual = msg.model_dump_json(indent=None)
-    expected = '{"level":20,"timestamp":"2021-03-28T00:34:08","message":"something went wrong","original_message":{"a":12,"b":"hello"}}'
+    actual = msg.json(indent=None)
+    expected = '{"level": 20, "timestamp": "2021-03-28T00:34:08", "message": "something went wrong"}'
     assert actual == expected, actual
 
     msg = LogMessage(
@@ -55,12 +55,12 @@ def test_model_training_request():
         total_no_of_records=1000,
     )
 
-    expected = '{"AccountId":12345,"ApplicationId":null,"ModelId":"10001","task_type":"churn","total_no_of_records":1000}'
-    actual = model_training_request.model_dump_json()
+    expected = '{"AccountId": 12345, "ApplicationId": null, "ModelId": "10001", "task_type": "churn", "total_no_of_records": 1000}'
+    actual = model_training_request.json()
 
     assert actual == expected, actual
 
-    parsed = ModelTrainingRequest.model_validate_json(actual)
+    parsed = ModelTrainingRequest.parse_raw(actual)
     assert parsed == model_training_request
 
 
@@ -74,12 +74,12 @@ def test_event_data():
         OccurredTimeTicks=1616891648496,
     )
 
-    expected = '{"AccountId":12345,"ApplicationId":null,"ModelId":"10001","DefinitionId":"BigButton","OccurredTime":"2021-03-28T00:34:08","OccurredTimeTicks":1616891648496,"PersonId":123456789}'
-    actual = event_data.model_dump_json()
+    expected = '{"AccountId": 12345, "ApplicationId": null, "ModelId": "10001", "DefinitionId": "BigButton", "OccurredTime": "2021-03-28T00:34:08", "OccurredTimeTicks": 1616891648496, "PersonId": 123456789}'
+    actual = event_data.json()
 
     assert actual == expected, actual
 
-    parsed = EventData.model_validate_json(actual)
+    parsed = EventData.parse_raw(actual)
     assert parsed == event_data
 
 
@@ -91,12 +91,12 @@ def test_training_data_status():
         total_no_of_records=54,
     )
 
-    expected = '{"AccountId":12345,"ModelId":"10001","no_of_records":23,"total_no_of_records":54}'
-    actual = training_data_status.model_dump_json()
+    expected = '{"AccountId": 12345, "ModelId": "10001", "no_of_records": 23, "total_no_of_records": 54}'
+    actual = training_data_status.json()
 
     assert actual == expected, actual
 
-    parsed = TrainingDataStatus.model_validate_json(actual)
+    parsed = TrainingDataStatus.parse_raw(actual)
     assert parsed == training_data_status
 
 
@@ -108,12 +108,12 @@ def test_training_model_start():
         no_of_records=100,
     )
 
-    expected = '{"AccountId":12345,"ApplicationId":null,"ModelId":"10001","task_type":"churn","no_of_records":100}'
-    actual = training_model_start.model_dump_json()
+    expected = '{"AccountId": 12345, "ApplicationId": null, "ModelId": "10001", "task_type": "churn", "no_of_records": 100}'
+    actual = training_model_start.json()
 
     assert actual == expected, actual
 
-    parsed = TrainingModelStart.model_validate_json(actual)
+    parsed = TrainingModelStart.parse_raw(actual)
     assert parsed == training_model_start
 
 
@@ -183,22 +183,20 @@ def test_training_model_status():
         total_no_of_steps=20,
     )
 
-    expected = '{"AccountId":12345,"ApplicationId":null,"ModelId":"123","current_step":1,"current_step_percentage":0.21,"total_no_of_steps":20}'
-    actual = training_model_status.model_dump_json()
+    expected = '{"AccountId": 12345, "ApplicationId": null, "ModelId": "123", "current_step": 1, "current_step_percentage": 0.21, "total_no_of_steps": 20}'
+    actual = training_model_status.json()
 
     assert actual == expected, actual
 
-    parsed = TrainingModelStatus.model_validate_json(actual)
+    parsed = TrainingModelStatus.parse_raw(actual)
     assert parsed == training_model_status
 
 
 def test_start_prediction():
     model_metrics = StartPrediction(AccountId=12345, ModelId="10058", task_type="churn")
 
-    expected = (
-        '{"AccountId":12345,"ApplicationId":null,"ModelId":"10058","task_type":"churn"}'
-    )
-    actual = model_metrics.model_dump_json()
+    expected = '{"AccountId": 12345, "ApplicationId": null, "ModelId": "10058", "task_type": "churn"}'
+    actual = model_metrics.json()
 
     assert actual == expected, actual
 
@@ -216,8 +214,8 @@ def test_model_metrics():
         f1=2 * 0.94 * 0.98 / (0.94 + 0.98),
     )
 
-    expected = '{"AccountId":12345,"ApplicationId":null,"ModelId":"456","timestamp":"2021-03-28T00:34:08","task_type":"churn","auc":0.95,"f1":0.9595833333333332,"precission":0.98,"recall":0.94,"accuracy":0.99}'
-    actual = model_metrics.model_dump_json()
+    expected = '{"AccountId": 12345, "ApplicationId": null, "ModelId": "456", "timestamp": "2021-03-28T00:34:08", "task_type": "churn", "auc": 0.95, "f1": 0.9595833333333332, "precission": 0.98, "recall": 0.94, "accuracy": 0.99}'
+    actual = model_metrics.json()
 
     assert actual == expected, actual
 
@@ -233,8 +231,8 @@ def test_model_metrics():
         f1=2 * 0.94 * 0.98 / (0.94 + 0.98),
     )
 
-    parsed = ModelMetrics.model_validate_json(actual)
-    assert parsed == model_metrics
+    parsed = ModelMetrics.parse_raw(actual)
+    assert parsed == model_metrics, f"{parsed}!={model_metrics}"
 
 
 def test_prediction():
@@ -247,8 +245,8 @@ def test_prediction():
         score=0.873,
     )
 
-    expected = '{"AccountId":12345,"ApplicationId":null,"ModelId":"20001","PersonId":123456789,"prediction_time":"2021-03-28T00:34:08","task_type":"churn","score":0.873}'
-    actual = prediction.model_dump_json()
+    expected = '{"AccountId": 12345, "ApplicationId": null, "ModelId": "20001", "PersonId": 123456789, "prediction_time": "2021-03-28T00:34:08", "task_type": "churn", "score": 0.873}'
+    actual = prediction.json()
 
     assert actual == expected, actual
 
@@ -261,5 +259,5 @@ def test_prediction():
         score=0.873,
     )
 
-    parsed = Prediction.model_validate_json(actual)
-    assert parsed == prediction
+    parsed = Prediction.parse_raw(actual)
+    assert parsed == prediction, f"{parsed}!={prediction}"

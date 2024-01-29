@@ -57,6 +57,4 @@ async def test_add_download_training_data(monkeypatch):
 
             await asyncio.sleep(5)
 
-            on_training_model_start.mock.assert_any_call(
-                training_model_start.model_dump()
-            )
+            on_training_model_start.mock.assert_any_call(training_model_start.dict())

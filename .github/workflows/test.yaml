@@ -118,24 +118,8 @@ jobs:
           name: coverage-html
           path: htmlcov
 
-  # https://github.com/marketplace/actions/alls-green#why
-  check: # This job does nothing and is only used for the branch protection
-    if: github.event.pull_request.draft == false
-
-    needs:
-      - static_analysis
-      - coverage-combine
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Decide whether the needed jobs succeeded or failed
-        uses: re-actors/alls-green@release/v1 # nosemgrep
-        with:
-          jobs: ${{ toJSON(needs) }}
-
   docker_build_push:
     runs-on: ubuntu-22.04
-    needs: [check]
     permissions:
       contents: read
       packages: write
@@ -162,19 +146,35 @@ jobs:
 
       - run: wget https://github.com/aquasecurity/trivy/releases/download/v0.18.3/trivy_0.18.3_Linux-64bit.deb
       - run: sudo dpkg -i trivy_0.18.3_Linux-64bit.deb
-      # - run: docker pull ghcr.io/$GITHUB_REPOSITORY:$GITHUB_REF_NAME || docker pull ghcr.io/$GITHUB_REPOSITORY:dev || true
+      - run: docker pull ghcr.io/$GITHUB_REPOSITORY:$GITHUB_REF_NAME || docker pull ghcr.io/$GITHUB_REPOSITORY:dev || true
       - run: bash ./scripts/build_docker.sh
       # - run: bash ./scripts/check_docker.sh
       - name: Push only if branch name is main or dev
         if: github.ref_name == 'main' || github.ref_name == 'dev'
         run: docker push ghcr.io/$GITHUB_REPOSITORY --all-tags
 
+  # https://github.com/marketplace/actions/alls-green#why
+  check: # This job does nothing and is only used for the branch protection
+    if: github.event.pull_request.draft == false
+
+    needs:
+      - static_analysis
+      - coverage-combine
+      - docker_build_push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1 # nosemgrep
+        with:
+          jobs: ${{ toJSON(needs) }}
+
   deploy:
     runs-on: ubuntu-22.04
     defaults:
       run:
         shell: bash
-    needs: [docker_build_push]
+    needs: [docker_build_push, check]
     if: github.ref_name == 'main' || github.ref_name == 'dev'
     container:
       image: ubuntu:22.04

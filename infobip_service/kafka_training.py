@@ -6,16 +6,18 @@ import traceback
 from datetime import datetime
 from os import environ
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pandas as pd
-import torch
 from faststream import FastStream
 from faststream.kafka import KafkaBroker
 from faststream.security import SASLScram256
 
 from infobip_service.download import (
+    download_account_id_rows_as_parquet,
     get_count_for_account_id,
 )
+from infobip_service.infobip_model_api import TimeSeriesDownstreamSolution
 from infobip_service.kafka_server import (
     ModelMetrics,
     ModelTrainingRequest,
@@ -28,7 +30,6 @@ from infobip_service.kafka_server import (
 )
 from infobip_service.logger import get_logger, supress_timestamps
 from infobip_service.preprocessing import preprocess_dataset
-from infobip_service.train_model import train_model
 
 supress_timestamps(False)
 logger = get_logger(__name__)
@@ -161,37 +162,39 @@ def custom_df_map_f(df: pd.DataFrame) -> pd.DataFrame:
 #     **kwargs: Any,
 # ) -> None:
 
-if not hasattr(broker, "models"):
-    broker.models: dict[tuple[int, str], torch.nn.Module] = {}  # type: ignore
+# if not hasattr(broker, "models"):
+models: dict[tuple[int, str], TimeSeriesDownstreamSolution] = {}  # type: ignore
 
 
-@broker.publisher(f"{username}_training_model_status")
+# @broker.publisher(f"{username}_training_model_status")
 async def to_training_model_status(
     training_model_status: TrainingModelStatus,
-) -> TrainingModelStatus:
+) -> None:
     logger.info(f"to_training_model_status({training_model_status})")
-    return training_model_status
+    await broker.publish(
+        training_model_status, topic=f"{username}_training_model_status"
+    )
 
 
-@broker.publisher(f"{username}_model_metrics")
+# @broker.publisher(f"{username}_model_metrics")
 async def to_model_metrics(
     model_metrics: ModelMetrics,
-) -> ModelMetrics:
+) -> None:
     logger.info(f"to_model_metrics({model_metrics})")
-    return model_metrics
+    await broker.publish(model_metrics, topic=f"{username}_model_metrics")
 
 
-@broker.publisher(f"{username}_start_prediction")
+# @broker.publisher(f"{username}_start_prediction")
 async def to_start_prediction(
     start_prediction: StartPrediction,
-) -> StartPrediction:
+) -> None:
     logger.info("*" * 100)
     logger.info(f"to_start_prediction({start_prediction})")
     logger.info("*" * 100)
-    return start_prediction
+    await broker.publish(start_prediction, topic=f"{username}_start_prediction")
 
 
-async def preprocess(msg: TrainingModelStatus, broker: KafkaBroker = broker) -> Path:
+async def preprocess(msg: TrainingModelStatus) -> Path:
     # processing message
 
     AccountId = msg.AccountId  # noqa: N806
@@ -267,6 +270,7 @@ async def train(
         ApplicationId=ApplicationId,
         ModelId=ModelId,
     )
+    input_data_path = paths["input_data_path"]
     training_path = paths["training_path"]
     preprocessing_path = paths["preprocessing_path"]
 
@@ -280,11 +284,11 @@ async def train(
     )
     await to_training_model_status(training_model_status)
 
-    if training_path.exists() and (AccountId, ModelId) in broker.models:  # type: ignore [attr-defined]
+    if training_path.exists() and (AccountId, ModelId) in models:  # type: ignore [attr-defined]
         logger.info(
             f"on_training_model_status({msg})->train(): path '{training_path}' exists, moving on..."
         )
-        trained_model = broker.models[(AccountId, ModelId)]  # type: ignore [attr-defined]
+        trained_model = models[(AccountId, ModelId)]  # type: ignore [attr-defined]
     else:
         if training_path.exists():
             logger.info(
@@ -301,17 +305,20 @@ async def train(
             f"on_training_model_status({msg})->train(): training data for {downstream_epochs} epochs..."
         )
         try:
-            trained_model = train_model(
-                processed_data_path=preprocessing_path, epochs=downstream_epochs
+            timeseries_model = TimeSeriesDownstreamSolution(
+                raw_data_path=input_data_path,
+                processed_data_path=preprocessing_path,
+                epochs=downstream_epochs,
+                learning_rate=0.001,
             )
-
+            trained_model = timeseries_model.train()
         except Exception as e:
             logger.error(
                 f"on_training_model_status({msg})->train(): training failed: {e=}"
             )
             raise e
 
-        broker.models[(AccountId, ModelId)] = trained_model  # type: ignore [attr-defined]
+        models[(AccountId, ModelId)] = trained_model  # type: ignore [attr-defined]
 
     training_model_status = TrainingModelStatus(
         AccountId=AccountId,
@@ -361,11 +368,10 @@ async def train(
 )
 async def on_training_model_status(
     msg: TrainingModelStatus,
-    broker: KafkaBroker = broker,
-    AccountId: int | None = None,
-    ModelId: int | str | None = None,
-    skip_all_requests: bool = False,
 ) -> None:
+    AccountId: int | None = None  # noqa: N806
+    ModelId: int | str | None = None  # noqa: N806
+    skip_all_requests: bool = False
     try:
         logger.info(f"on_training_model_status({msg}) started")
 
@@ -406,7 +412,7 @@ async def on_training_model_status(
 
 # Prediction
 
-prediction = None
+prediction: pd.DataFrame | None = None
 
 # def add_predictions(
 #     app: FastKafka,
@@ -420,152 +426,135 @@ prediction = None
 # ) -> None:
 
 
-@broker.publisher(f"{username}_start_training_data")
+# @broker.publisher(f"{username}_start_training_data")
 async def to_start_training_data(
     request: ModelTrainingRequest,
-) -> ModelTrainingRequest:
+) -> None:
     logger.info(f"to_start_training_data({request})")
-    return request
+    await broker.publish(request, topic=f"{username}_start_training_data")
 
 
-@broker.publisher(f"{username}_prediction")
+# @broker.publisher(f"{username}_prediction")
 async def to_prediction(
     prediction: Prediction,
-) -> Prediction:
+) -> None:
     #         logger.info(f"to_prediction({prediction})")
-    return prediction
+    await broker.publish(prediction, topic=f"{username}_prediction")
 
 
-# @broker.subscriber(
-#     f"{username}_start_prediction",
-#     auto_offset_reset="earliest",
-#     group_id=training_group_id,
-# )
-# async def on_start_prediction(
-#     msg: StartPrediction,
-#     broker: KafkaBroker = broker,
-#     skip_all_requests: bool = False,
-# ) -> None:
-#     global prediction
-#     try:
-#         if skip_all_requests:
-#             logger.info(
-#                 f"on_training_model_status({msg}) skipping due to skip_all_requests set to True..."
-#             )
-#             return
+@broker.subscriber(
+    f"{username}_start_prediction",
+    auto_offset_reset="earliest",
+    group_id=training_group_id,
+)
+async def on_start_prediction(
+    msg: StartPrediction,
+) -> None:
+    global prediction
+    skip_all_requests: bool = False
+    try:
+        if skip_all_requests:
+            logger.info(
+                f"on_training_model_status({msg}) skipping due to skip_all_requests set to True..."
+            )
+            return
 
-#         AccountId = msg.AccountId
-#         ApplicationId = msg.ApplicationId
-#         ModelId = msg.ModelId
-#         task_type = msg.task_type
-#         prediction_time = datetime.now()
+        AccountId = msg.AccountId  # noqa: N806
+        ApplicationId = msg.ApplicationId  # noqa: N806
+        ModelId = msg.ModelId  # noqa: N806
+        task_type = msg.task_type
+        prediction_time = datetime.now()
 
-#         if (AccountId, ModelId) not in broker.models:
-#             request = ModelTrainingRequest(
-#                 AccountId=AccountId,
-#                 ApplicationId=ApplicationId,
-#                 ModelId=ModelId,
-#                 task_type=task_type,
-#                 total_no_of_records=0,
-#             )
-#             logger.info(
-#                 f"on_start_prediction({msg}) no model found, making training request {request=}"
-#             )
-#             await to_start_training_data(request)
-#             return
+        if (AccountId, ModelId) not in models:
+            request = ModelTrainingRequest(
+                AccountId=AccountId,
+                ApplicationId=ApplicationId,
+                ModelId=ModelId,
+                task_type=task_type,
+                total_no_of_records=0,
+            )
+            logger.info(
+                f"on_start_prediction({msg}) no model found, making training request {request=}"
+            )
+            await to_start_training_data(request)
+            return
 
-#         churn_unet_solution = broker.models[(AccountId, ModelId)]
+        trained_model = models[(AccountId, ModelId)]
 
-#         if AccountId is not None and msg.AccountId != AccountId:
-#             logger.info(
-#                 f"on_start_prediction({msg}) skipping due to {msg.AccountId=}, {AccountId=}"
-#             )
-#             return
+        if AccountId is not None and msg.AccountId != AccountId:
+            logger.info(
+                f"on_start_prediction({msg}) skipping due to {msg.AccountId=}, {AccountId=}"
+            )
+            return
 
-#         if ModelId is not None and msg.ModelId != ModelId:
-#             logger.info(
-#                 f"on_start_prediction({msg}) Skipping due to {msg.ModelId=}, {ModelId=}"
-#             )
-#             return
+        if ModelId is not None and msg.ModelId != ModelId:
+            logger.info(
+                f"on_start_prediction({msg}) Skipping due to {msg.ModelId=}, {ModelId=}"
+            )
+            return
 
-#         paths = get_paths(
-#             downloading_root_path=downloading_root_path,
-#             training_root_path=training_root_path,
-#             AccountId=AccountId,
-#             ApplicationId=ApplicationId,
-#             ModelId=ModelId,
-#         )
-#         prediction_path = paths["prediction_path"]
+        # paths = get_paths(
+        #     downloading_root_path=downloading_root_path,
+        #     training_root_path=training_root_path,
+        #     AccountId=AccountId,
+        #     ApplicationId=ApplicationId,
+        #     ModelId=ModelId,
+        # )
 
-#         with TemporaryDirectory() as d:
-#             prediction_input_data_path = Path(d)
+        with TemporaryDirectory() as d:
+            prediction_input_data_path = Path(d)
 
-#             logger.info(
-#                 f"on_start_prediction({msg}): downloading prediction data to '{prediction_input_data_path}'..."
-#             )
-#             # with using_cluster("cpu"):
-#             download_account_id_rows_as_parquet(
-#                 account_id=AccountId,
-#                 output_path=prediction_input_data_path,
-#                 history_size=history_size,
-#                 application_id=ApplicationId,
-#             )
+            logger.info(
+                f"on_start_prediction({msg}): downloading prediction data to '{prediction_input_data_path}'..."
+            )
+            # with using_cluster("cpu"):
+            download_account_id_rows_as_parquet(
+                account_id=AccountId,
+                output_path=prediction_input_data_path,
+                history_size=history_size,
+                application_id=ApplicationId,
+            )
 
-#             logger.info(
-#                 f"on_start_prediction({msg}): prediction data downloaded to '{prediction_input_data_path}'..."
-#             )
+            logger.info(
+                f"on_start_prediction({msg}): prediction data downloaded to '{prediction_input_data_path}'..."
+            )
 
-#             # make predictions
-#             prediction_time = datetime.now()
-#             # with using_cpu_cluster():
-#             churn_prediction_data: TimeSeriesDownstreamPrediction = (
-#                 TimeSeriesDownstreamPrediction.from_parquet_files(
-#                     input_data_path=prediction_input_data_path,
-#                     root_path=prediction_path,
-#                     history_size=history_size,
-#                     custom_df_map_f=custom_df_map_f,
-#                     timestamp_column="OccurredTime",
-#                 )
-#             )
+            # make predictions
+            prediction_time = datetime.now()
+            from traceback_with_variables import printing_exc
 
-#         # todo: remove debugging stuff
-#         broker.churn_prediction_data = churn_prediction_data
-#         from traceback_with_variables import printing_exc
+            with printing_exc():
+                prediction = trained_model.predict(prediction_input_data_path)
 
-#         with printing_exc():
-#             prediction = churn_unet_solution.predict(
-#                 prediction_data=churn_prediction_data
-#             )
+        # check for NA values
+        df = prediction[prediction["prediction"].isna()]
+        if df.shape[0] > 0:
+            logger.info(
+                f"on_start_prediction({msg}): predictions have undefined values {df}"
+            )
 
-#         # check for NA values
-#         df = prediction[prediction["prediction"].isna()]
-#         if df.shape[0] > 0:
-#             logger.info(
-#                 f"on_start_prediction({msg}): predictions have undefined values {df}"
-#             )
+        logger.info(f"{prediction.head()=}")
+        logger.info(f"{prediction.tail()=}")
 
-#         logger.info(f"{prediction.head()=}")
-#         logger.info(f"{prediction.tail()=}")
-
-#         for i, x in (
-#             prediction[~prediction["prediction"].isna()].reset_index().iterrows()
-#         ):
-#             p = Prediction(
-#                 AccountId=AccountId,
-#                 ApplicationId=ApplicationId,
-#                 ModelId=ModelId,
-#                 PersonId=x["PersonId"],
-#                 prediction_time=prediction_time,
-#                 task_type="churn",
-#                 score=x["prediction"],
-#             )
-#             await to_prediction(p)
-#         logger.info(
-#             f"on_start_prediction({msg}): predictions sent, the last one being: {p}"
-#         )
-#     except Exception as e:
-#         logger.info(f"on_start_prediction({msg}): predictions failed - {e!s}")
-#         logger.info(f"on_start_prediction({msg}): predictions failed, moving on...")
+        for _, x in (
+            prediction[~prediction["prediction"].isna()].reset_index().iterrows()
+        ):
+            p = Prediction(
+                AccountId=AccountId,
+                ApplicationId=ApplicationId,
+                ModelId=ModelId,
+                PersonId=x["PersonId"],
+                prediction_time=prediction_time,
+                task_type="churn",  # type: ignore [arg-type]
+                score=x["prediction"],
+            )
+            await to_prediction(p)
+        logger.info(
+            f"on_start_prediction({msg}): predictions sent, the last one being: {p}"
+        )
+    except Exception as e:
+        logger.info(f"on_start_prediction({msg}): predictions failed - {e!s}")
+        logger.info(f"on_start_prediction({msg}): predictions failed, moving on...")
 
 
 # Airt Service part
@@ -584,20 +573,20 @@ stop_on_no_change_interval = 60
 abort_on_no_change_interval = 120
 
 
-@broker.publisher(f"{username}_training_data_status")
+# @broker.publisher(f"{username}_training_data_status")
 async def to_training_data_status(
     training_data_status: TrainingDataStatus,
-) -> TrainingDataStatus:
+) -> None:
     logger.info(f"to_training_data_status({training_data_status})")
-    return training_data_status
+    await broker.publish(training_data_status, topic=f"{username}_training_data_status")
 
 
-@broker.publisher(f"{username}_training_model_start")
+# @broker.publisher(f"{username}_training_model_start")
 async def to_training_model_start(
     training_model_start: TrainingModelStart,
-) -> TrainingModelStart:
+) -> None:
     logger.info(f"to_training_model_start({training_model_start})")
-    return training_model_start
+    await broker.publish(training_model_start, topic=f"{username}_training_model_start")
 
 
 @broker.subscriber(
@@ -606,7 +595,7 @@ async def to_training_model_start(
     group_id=training_group_id,
 )
 async def on_start_training_data(msg: ModelTrainingRequest) -> None:
-    logger.info(msg, "on_start_training_data() starting...")
+    logger.info(f"on_start_training_data({msg=}) starting...")
 
     account_id = msg.AccountId
     total_no_of_records = msg.total_no_of_records
@@ -624,28 +613,27 @@ async def on_start_training_data(msg: ModelTrainingRequest) -> None:
         if curr_count is not None:
             if tracker.update(curr_count):
                 training_data_status = TrainingDataStatus(
-                    no_of_records=curr_count, **msg.model_dump()
+                    no_of_records=curr_count, **msg.dict()
                 )
                 await to_training_data_status(training_data_status)
         else:
             logger.warning(
-                msg,
-                "on_start_training_data(): no data yet received in the database.",
+                f"on_start_training_data({msg=}): no data yet received in the database.",
             )
 
         await asyncio.sleep(sleep_interval)
 
     if tracker.aborted():
-        logger.error(msg, "on_start_training_data(): data retrieval aborted!")
+        logger.error(f"on_start_training_data({msg=}): data retrieval aborted!")
     else:
         # trigger model training start
         training_model_start = TrainingModelStart(
             no_of_records=curr_count,  # type: ignore [arg-type]
-            **msg.model_dump(),
+            **msg.dict(),
         )
         await to_training_model_start(training_model_start)
 
-        logger.info(msg, "on_start_training_data(): finished")
+        logger.info(f"on_start_training_data({msg=}): finished")
 
 
 app = FastStream(broker=broker)

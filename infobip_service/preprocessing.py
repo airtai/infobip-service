@@ -10,6 +10,10 @@ import pandas as pd
 from dask.distributed import Client, LocalCluster
 
 from infobip_service.download import raw_data_path
+from infobip_service.logger import get_logger, supress_timestamps
+
+supress_timestamps(False)
+logger = get_logger(__name__)
 
 processed_data_path = Path() / ".." / "data" / "processed"
 
@@ -241,13 +245,14 @@ def prepare_data(
     max_time: datetime,
     history_size: int,
 ) -> pd.DataFrame:
+    logger.info("Preparing meta for sampling user histories")
     meta = sample_user_histories(
         ddf.head(2, npartitions=-1),
         min_time=min_time,
         max_time=max_time,
         history_size=history_size,
     )
-
+    logger.info("Sampling user histories")
     sampled_data = ddf.map_partitions(
         sample_user_histories,
         min_time=min_time,
@@ -255,7 +260,7 @@ def prepare_data(
         history_size=history_size,
         meta=meta,
     )
-
+    logger.info("User histories sampled")
     return sampled_data
 
 
@@ -276,27 +281,27 @@ def preprocess_train_validation(
     raw_data_path: Path, processed_data_path: Path
 ) -> tuple[dd.DataFrame, dd.DataFrame]:  # type: ignore
     # Read raw data
-    print("Reading raw data...")  # noqa: T201
+    logger.info("Reading raw data...")
     raw_data = dd.read_parquet(raw_data_path)  # type: ignore
-    print("Raw data read.")  # noqa: T201
+    logger.info("Raw data read.")
 
     # Calculate time threshold
-    print("Calculating time threshold...")  # noqa: T201
+    logger.info("Calculating time threshold...")
     time_stats = raw_data["OccurredTime"].describe().compute()
     max_time = datetime.strptime(time_stats["max"], "%Y-%m-%d %H:%M:%S.%f")
     time_treshold = max_time - timedelta(days=28)
-    print("Time threshold calculated.")  # noqa: T201
+    logger.info("Time threshold calculated.")
 
     # Time thresholding
-    print("Time thresholding...")  # noqa: T201
+    logger.info("Time thresholding...")
     time_cutoff_data = sample_time_map(raw_data, time_treshold=time_treshold)
     time_cutoff_data = write_and_read_parquet(
         time_cutoff_data, path=processed_data_path / "time_cutoff_data.parquet"
     )
-    print("Time thresholding done.")  # noqa: T201
+    logger.info("Time thresholding done.")
 
     # Remove users without history
-    print("Removing users without history...")  # noqa: T201
+    logger.info("Removing users without history...")
     data_before_horizon = remove_without_history(
         time_cutoff_data, time_treshold=time_treshold - timedelta(days=28)
     )
@@ -304,10 +309,10 @@ def preprocess_train_validation(
         data_before_horizon,
         path=processed_data_path / "data_before_horizon.parquet",
     )
-    print("Users without history removed.")  # noqa: T201
+    logger.info("Users without history removed.")
 
     # Train/test split
-    print("Splitting data...")  # noqa: T201
+    logger.info("Splitting data...")
     train_raw, validation_raw = split_data(data_before_horizon, split_ratio=0.8)
     train_raw = write_and_read_parquet(
         train_raw.repartition(partition_size="10MB"),
@@ -317,10 +322,10 @@ def preprocess_train_validation(
         validation_raw.repartition(partition_size="10MB"),
         path=processed_data_path / "validation_raw.parquet",
     )
-    print("Data split to train/validation.")  # noqa: T201
+    logger.info("Data split to train/validation.")
 
     # Prepare data
-    print("Preparing data...")  # noqa: T201
+    logger.info("Preparing data...")
     train_prepared = write_and_read_parquet(
         prepare_ddf(train_raw, history_size=64),
         path=processed_data_path / "train_prepared.parquet",
@@ -329,7 +334,7 @@ def preprocess_train_validation(
         prepare_ddf(validation_raw, history_size=64),
         path=processed_data_path / "validation_prepared.parquet",
     )
-    print("Data prepared.")  # noqa: T201
+    logger.info("Data prepared.")
 
     return train_prepared, validation_prepared
 
@@ -395,17 +400,17 @@ def prepare_test_data(
 
 def preprocess_test(raw_data_path: Path, processed_data_path: Path) -> dd.DataFrame:  # type: ignore
     # Read raw data
-    print("Reading raw data...")  # noqa: T201
+    logger.info("Reading raw data...")
     raw_data = dd.read_parquet(raw_data_path)  # type: ignore
-    print("Raw data read.")  # noqa: T201
+    logger.info("Raw data read.")
 
     # Calculate time threshold
-    print("Calculating max time...")  # noqa: T201
+    logger.info("Calculating max time...")
     time_stats = raw_data["OccurredTime"].describe().compute()
     max_time = datetime.strptime(time_stats["max"], "%Y-%m-%d %H:%M:%S.%f")
-    print("Max time calculated.")  # noqa: T201
+    logger.info("Max time calculated.")
 
-    print("Removing users without history...")  # noqa: T201
+    logger.info("Removing users without history...")
     data_before_horizon = remove_without_history(
         raw_data,
         time_treshold=max_time - timedelta(days=28),
@@ -415,10 +420,10 @@ def preprocess_test(raw_data_path: Path, processed_data_path: Path) -> dd.DataFr
         data_before_horizon,
         path=processed_data_path / "test_data_before_horizon.parquet",
     )
-    print("Users without history removed.")  # noqa: T201
+    logger.info("Users without history removed.")
 
     # Prepare data
-    print("Preparing data...")  # noqa: T201
+    logger.info("Preparing data...")
     data_prepared = prepare_test_data(
         data_before_horizon.repartition(partition_size="5MB"),
         history_size=64,
@@ -428,7 +433,7 @@ def preprocess_test(raw_data_path: Path, processed_data_path: Path) -> dd.DataFr
         data_prepared,
         path=processed_data_path / "test_prepared.parquet",
     )
-    print("Data prepared.")  # noqa: T201
+    logger.info("Data prepared.")
 
     return data_prepared
 
@@ -464,28 +469,36 @@ def calculate_time_mean_std(
 
 
 def preprocess_dataset(raw_data_path: Path, processed_data_path: Path) -> None:
+    logger.info("Starting preprocessing...")
     cluster = LocalCluster()  # type: ignore
     client = Client(cluster)  # type: ignore
+    logger.info("Local cluster and client started.")
 
-    print(client)  # noqa: T201
+    logger.info(client)
 
     processed_data_path.mkdir(exist_ok=True)
+    logger.info("Created processed data path.")
 
     try:
+        logger.info("Calculating vocab...")
         calculate_vocab(
             dd.read_parquet(raw_data_path),  # type: ignore
             column="DefinitionId",
             processed_data_path=processed_data_path,
         )
+        logger.info("Calculating time mean and std...")
         calculate_time_mean_std(
             dd.read_parquet(raw_data_path),  # type: ignore
             processed_data_path=processed_data_path,
         )
+        logger.info("Preprocessing test data...")
         preprocess_test(raw_data_path, processed_data_path)
+        logger.info("Preprocessing train/validation data...")
         preprocess_train_validation(raw_data_path, processed_data_path)
     finally:
         client.close()  # type: ignore
         cluster.close()  # type: ignore
+    logger.info("Preprocessing done.")
 
 
 if __name__ == "__main__":

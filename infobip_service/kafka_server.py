@@ -1,15 +1,10 @@
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any
 
-from fast_depends._compat import PYDANTIC_V2 as PYDANTIC_V2
 from pydantic import BaseModel, Field, NonNegativeInt
 
 from infobip_service.logger import get_logger, supress_timestamps
-
-if PYDANTIC_V2:
-    from pydantic import SerializeAsAny, field_serializer
 
 get_count_for_account_id: Callable[[int, str], tuple[int, datetime]] | None = None
 get_all_person_ids_for_account_id: Callable[[int, str], list[int]] | None = None
@@ -33,12 +28,10 @@ class LogMessage(BaseModel):
         json_schema_extra={"example": "something went wrong", "description": "message"},
     )
 
-    if PYDANTIC_V2:
-        original_message: SerializeAsAny[BaseModel | None] = Field(...)
-
-        @field_serializer("timestamp")
-        def serialize_timestamp(self, timestamp: datetime, _info: Any) -> str:
-            return timestamp.strftime("%Y-%m-%dT%H:%M:%S")
+    class Config:
+        json_encoders = {  # noqa: RUF012
+            datetime: lambda v: v.strftime("%Y-%m-%dT%H:%M:%S"),
+        }
 
 
 class TaskType(str, Enum):
@@ -130,11 +123,10 @@ class EventData(BaseModel):
         ..., json_schema_extra={"example": 12345678, "description": "ID of a person"}
     )
 
-    if PYDANTIC_V2:
-
-        @field_serializer("OccurredTime")
-        def serialize_timestamp(self, timestamp: datetime, _info: Any) -> str:
-            return timestamp.strftime("%Y-%m-%dT%H:%M:%S")
+    class Config:
+        json_encoders = {  # noqa: RUF012
+            datetime: lambda v: v.strftime("%Y-%m-%dT%H:%M:%S"),
+        }
 
 
 class RealtimeData(EventData):
@@ -341,11 +333,10 @@ class ModelMetrics(BaseModel):
         ..., examples=[0.82], description="accuracy", ge=0.0, le=1.0
     )
 
-    if PYDANTIC_V2:
-
-        @field_serializer("timestamp")
-        def serialize_timestamp(self, timestamp: datetime, _info: Any) -> str:
-            return timestamp.strftime("%Y-%m-%dT%H:%M:%S")
+    class Config:
+        json_encoders = {  # noqa: RUF012
+            datetime: lambda v: v.strftime("%Y-%m-%dT%H:%M:%S"),
+        }
 
 
 class Prediction(BaseModel):
@@ -386,8 +377,7 @@ class Prediction(BaseModel):
         le=1.0,
     )
 
-    if PYDANTIC_V2:
-
-        @field_serializer("prediction_time")
-        def serialize_timestamp(self, timestamp: datetime, _info: Any) -> str:
-            return timestamp.strftime("%Y-%m-%dT%H:%M:%S")
+    class Config:
+        json_encoders = {  # noqa: RUF012
+            datetime: lambda v: v.strftime("%Y-%m-%dT%H:%M:%S"),
+        }

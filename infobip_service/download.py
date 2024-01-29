@@ -319,7 +319,7 @@ def _get_count_for_account_id(
         logger.info(f"Getting count with query={query}")
 
         # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
-        result = connection.execute(query).fetchall()  # type: ignore
+        result = connection.exec_driver_sql(query).fetchall()  # type: ignore
 
         if len(result) == 0:
             return (None, None)
