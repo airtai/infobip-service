@@ -305,7 +305,7 @@ def preprocess_train_validation(
         data_before_horizon,
         path=processed_data_path / "data_before_horizon.parquet",
     )
-    logger.info("Users without history removed.")
+    logger.info("Users without history removed at preprocess_train_validation.")
 
     # Train/test split
     logger.info("Splitting data...")
@@ -378,12 +378,13 @@ def prepare_test_data(
     horizon_time: datetime,
     history_size: int,
 ) -> pd.DataFrame:  # type: ignore
+    logger.info("Preparing meta for sampling user histories")
     meta = sample_test_histories(
         ddf.head(2, npartitions=-1),
         horizon_time=horizon_time,
         history_size=history_size,
     )
-
+    logger.info("Sampling user histories")
     sampled_data = ddf.map_partitions(
         sample_test_histories,
         horizon_time=horizon_time,
@@ -416,7 +417,7 @@ def preprocess_test(raw_data_path: Path, processed_data_path: Path) -> dd.DataFr
         data_before_horizon,
         path=processed_data_path / "test_data_before_horizon.parquet",
     )
-    logger.info("Users without history removed.")
+    logger.info("Users without history removed at preprocess_test.")
 
     # Prepare data
     logger.info("Preparing data...")
