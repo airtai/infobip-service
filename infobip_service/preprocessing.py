@@ -200,49 +200,39 @@ def sample_user_histories(
     min_time = max(user_histories["OccurredTime"].describe()["min"], min_time)
 
     user_histories_sample = None
-    logger.info("Calculated min max")
-    logger.info("Calculating user_histories_sample")
     while num_samples_to_go > 0:
-        # logger.info(f"{num_samples_to_go=}")
         t0 = random_date(min_time, max_time)
         filtered_index = user_histories[
             user_histories["OccurredTime"] <= t0
         ].index.unique()
         if len(filtered_index) == 0:
             continue
-        # logger.info("Getting chosen user history")
         chosen_user_history = user_histories[
             user_histories.index.isin([choice(filtered_index)])  # nosec
         ]
-        # logger.info("Getting next event")
         next_event_timedelta = get_next_event(chosen_user_history, t0=t0)
-        # logger.info("Creating user history")
         reconstructed_history = create_user_histories(
             chosen_user_history, t0=t0, history_size=history_size
         )
-        # logger.info("Merging next event")
         reconstructed_history = pd.merge(
             reconstructed_history,
             next_event_timedelta,
             left_index=True,
             right_index=True,
         )
-        # logger.info("reconstructing history index")
         reconstructed_history.index = reconstructed_history.index.map(
             lambda x, t0=t0: (f"{x[0]}_{t0}", x[1])
         )
 
         if user_histories_sample is None:
-            # logger.info("Creating user_histories_sample")
             user_histories_sample = reconstructed_history
         else:
-            # logger.info("Updating user_histories_sample")
             user_histories_sample = pd.concat(
                 [user_histories_sample, reconstructed_history]
             )
 
         num_samples_to_go -= 1
-    logger.info("Calculated user_histories_sample")
+    logger.info("Partition processed.")
     return user_histories_sample
 
 
@@ -253,8 +243,6 @@ def prepare_data(
     max_time: datetime,
     history_size: int,
 ) -> pd.DataFrame:
-    logger.info("Preparing meta for sampling user histories")
-
     sample_for_meta = ddf.head(2, npartitions=-1)
 
     meta = sample_user_histories(
@@ -263,7 +251,6 @@ def prepare_data(
         max_time=sample_for_meta["OccurredTime"].describe()["max"],
         history_size=history_size,
     )
-    logger.info("Sampling user histories")
     sampled_data = ddf.map_partitions(
         sample_user_histories,
         min_time=min_time,
@@ -271,7 +258,6 @@ def prepare_data(
         history_size=history_size,
         meta=meta,
     )
-    logger.info("User histories sampled")
     return sampled_data
 
 
@@ -487,7 +473,7 @@ def preprocess_dataset(raw_data_path: Path, processed_data_path: Path) -> None:
 
     logger.info(client)
 
-    processed_data_path.mkdir(exist_ok=True)
+    processed_data_path.mkdir(exist_ok=True, parents=True)
     logger.info("Created processed data path.")
 
     try:
