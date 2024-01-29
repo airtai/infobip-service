@@ -311,7 +311,7 @@ async def train(
                 epochs=downstream_epochs,
                 learning_rate=0.001,
             )
-            trained_model = timeseries_model.train()
+            trained_model = timeseries_model.train(skip_preprocess=True)
         except Exception as e:
             logger.error(
                 f"on_training_model_status({msg})->train(): training failed: {e=}"
