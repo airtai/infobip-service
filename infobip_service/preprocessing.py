@@ -196,6 +196,7 @@ def sample_user_histories(
     max_time = min(
         user_histories["OccurredTime"].describe()["max"] + timedelta(days=1), max_time
     )
+
     min_time = max(user_histories["OccurredTime"].describe()["min"], min_time)
 
     user_histories_sample = None
@@ -252,10 +253,13 @@ def prepare_data(
     history_size: int,
 ) -> pd.DataFrame:
     logger.info("Preparing meta for sampling user histories")
+
+    sample_for_meta = ddf.head(2, npartitions=-1)
+
     meta = sample_user_histories(
-        ddf.head(2, npartitions=-1),
+        sample_for_meta,
         min_time=min_time,
-        max_time=max_time,
+        max_time=sample_for_meta["OccurredTime"].describe()["max"],
         history_size=history_size,
     )
     logger.info("Sampling user histories")
@@ -275,7 +279,6 @@ def prepare_ddf(ddf: dd.DataFrame, *, history_size: int) -> dd.DataFrame:  # typ
         ddf["OccurredTime"].describe().compute()["max"]
     ) - timedelta(days=28)
     min_time = convert_datetime(ddf["OccurredTime"].describe().compute()["min"])
-
     sampled_data = prepare_data(
         ddf, history_size=history_size, min_time=min_time, max_time=max_time
     )
