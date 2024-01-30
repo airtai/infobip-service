@@ -383,7 +383,12 @@ def calculate_vocab(
     *,
     column: str,
     processed_data_path: Path,
+    churn_time: timedelta = timedelta(days=28),
 ) -> None:
+    latest_event_time = convert_datetime(
+        ddf["OccurredTime"].describe().compute()["max"]
+    )
+    ddf = ddf[ddf["OccurredTime"] < latest_event_time - churn_time]
     vocabulary = list(ddf[column].unique().compute())
     with Path.open(processed_data_path / f"{column}_vocab.json", "w") as f:
         json.dump(vocabulary, f)
@@ -393,7 +398,12 @@ def calculate_time_mean_std(
     ddf: dd.DataFrame,  # type: ignore
     *,
     processed_data_path: Path,
+    churn_time: timedelta = timedelta(days=28),
 ) -> None:
+    latest_event_time = convert_datetime(
+        ddf["OccurredTime"].describe().compute()["max"]
+    )
+    ddf = ddf[ddf["OccurredTime"] < latest_event_time - churn_time]
     time_mean, time_std = (
         ddf["OccurredTime"].compute().mean(),
         ddf["OccurredTime"].std().compute(),
