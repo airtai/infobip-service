@@ -64,7 +64,7 @@ def train_model(
     datasets = {
         k: DataLoader(
             UserHistoryDataset(
-                processed_data_path / f"{k}_prepared.parquet", definitionId_vocab=vocab
+                processed_data_path / f"{k}.parquet", definitionId_vocab=vocab
             ),
             batch_size=16,
             num_workers=32,

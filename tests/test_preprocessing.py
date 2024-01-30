@@ -9,14 +9,14 @@ from infobip_service.dataset.preprocessing import (
     _get_next_event,
     _remove_without_history,
     _sample_time_map,
+    _sample_user_histories_by_time,
     convert_datetime,
     create_user_histories,
     get_next_event,
-    prepare_data,
     random_date,
     remove_without_history,
     sample_time_map,
-    sample_user_histories,
+    sample_user_histories_by_time,
     split_data,
     write_and_read_parquet,
 )
@@ -285,7 +285,7 @@ def test_random_date():
 
 def test_sample_user_histories():
     # TODO: patch random here and add asserts
-    user_histories_sample = sample_user_histories(
+    user_histories_sample = _sample_user_histories_by_time(
         user_histories_df,
         min_time=datetime(2023, 7, 9),
         max_time=datetime(2023, 7, 20),
@@ -296,7 +296,7 @@ def test_sample_user_histories():
 
 def test_sample_user_histories_single():
     # TODO: patch random here and add asserts
-    user_histories_sample = sample_user_histories(
+    user_histories_sample = _sample_user_histories_by_time(
         user_history_df,
         min_time=datetime(2023, 7, 9),
         max_time=datetime(2023, 8, 20),
@@ -314,7 +314,7 @@ def test_prepare_data_ddf():
         user_histories_ddf["OccurredTime"].describe().compute()["min"]
     )
 
-    sampled_data = prepare_data(
+    sampled_data = sample_user_histories_by_time(
         user_histories_ddf, history_size=8, min_time=min_time, max_time=max_time
     )
 
@@ -330,7 +330,7 @@ def test_prepare_data_ddf_single():
         user_history_ddf["OccurredTime"].describe().compute()["min"]
     )
 
-    sampled_data = prepare_data(
+    sampled_data = sample_user_histories_by_time(
         user_history_ddf, history_size=8, min_time=min_time, max_time=max_time
     )
 

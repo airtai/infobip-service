@@ -81,7 +81,6 @@ def split_data(
     *,
     split_ratio: float = 0.8,
 ) -> tuple[dd.DataFrame, dd.DataFrame]:  # type: ignore
-    # ddf = ddf.set_index(ddf.index, sorted=True)
     user_index = ddf.index.unique().compute()
     train_index = np.random.choice(
         user_index, size=int(len(user_index) * split_ratio), replace=False
@@ -184,7 +183,7 @@ def convert_datetime(time: str | pd.Timestamp) -> datetime:
         return datetime.strptime(time, "%Y-%m-%d %H:%M:%S.%f")
 
 
-def sample_user_histories(
+def _sample_user_histories_by_time(
     user_histories: pd.DataFrame,
     *,
     min_time: datetime,
@@ -232,11 +231,13 @@ def sample_user_histories(
             )
 
         num_samples_to_go -= 1
+
     logger.info("Partition processed.")
+
     return user_histories_sample
 
 
-def prepare_data(
+def sample_user_histories_by_time(
     ddf: dd.DataFrame,  # type: ignore
     *,
     min_time: datetime,
@@ -245,14 +246,14 @@ def prepare_data(
 ) -> pd.DataFrame:
     sample_for_meta = ddf.head(2, npartitions=-1)
 
-    meta = sample_user_histories(
+    meta = _sample_user_histories_by_time(
         sample_for_meta,
-        min_time=min_time,
+        min_time=sample_for_meta["OccurredTime"].describe()["min"],
         max_time=sample_for_meta["OccurredTime"].describe()["max"],
         history_size=history_size,
     )
     sampled_data = ddf.map_partitions(
-        sample_user_histories,
+        _sample_user_histories_by_time,
         min_time=min_time,
         max_time=max_time,
         history_size=history_size,
@@ -261,81 +262,7 @@ def prepare_data(
     return sampled_data
 
 
-def prepare_ddf(ddf: dd.DataFrame, *, history_size: int) -> dd.DataFrame:  # type: ignore
-    max_time = convert_datetime(
-        ddf["OccurredTime"].describe().compute()["max"]
-    ) - timedelta(days=28)
-    min_time = convert_datetime(ddf["OccurredTime"].describe().compute()["min"])
-    sampled_data = prepare_data(
-        ddf, history_size=history_size, min_time=min_time, max_time=max_time
-    )
-
-    return sampled_data
-
-
-def preprocess_train_validation(
-    raw_data_path: Path, processed_data_path: Path
-) -> tuple[dd.DataFrame, dd.DataFrame]:  # type: ignore
-    # Read raw data
-    logger.info("Reading raw data...")
-    raw_data = dd.read_parquet(raw_data_path)  # type: ignore
-    logger.info("Raw data read.")
-
-    # Calculate time threshold
-    logger.info("Calculating time threshold...")
-    time_stats = raw_data["OccurredTime"].describe().compute()
-    max_time = datetime.strptime(time_stats["max"], "%Y-%m-%d %H:%M:%S.%f")
-    time_treshold = max_time - timedelta(days=28)
-    logger.info("Time threshold calculated.")
-
-    # Time thresholding
-    logger.info("Time thresholding...")
-    time_cutoff_data = sample_time_map(raw_data, time_treshold=time_treshold)
-    time_cutoff_data = write_and_read_parquet(
-        time_cutoff_data, path=processed_data_path / "time_cutoff_data.parquet"
-    )
-    logger.info("Time thresholding done.")
-
-    # Remove users without history
-    logger.info("Removing users without history...")
-    data_before_horizon = remove_without_history(
-        time_cutoff_data, time_treshold=time_treshold - timedelta(days=28)
-    )
-    data_before_horizon = write_and_read_parquet(
-        data_before_horizon,
-        path=processed_data_path / "data_before_horizon.parquet",
-    )
-    logger.info("Users without history removed at preprocess_train_validation.")
-
-    # Train/test split
-    logger.info("Splitting data...")
-    train_raw, validation_raw = split_data(data_before_horizon, split_ratio=0.8)
-    train_raw = write_and_read_parquet(
-        train_raw.repartition(partition_size="10MB"),
-        path=processed_data_path / "train_raw.parquet",
-    )
-    validation_raw = write_and_read_parquet(
-        validation_raw.repartition(partition_size="10MB"),
-        path=processed_data_path / "validation_raw.parquet",
-    )
-    logger.info("Data split to train/validation.")
-
-    # Prepare data
-    logger.info("Preparing data...")
-    train_prepared = write_and_read_parquet(
-        prepare_ddf(train_raw, history_size=64),
-        path=processed_data_path / "train_prepared.parquet",
-    )
-    validation_prepared = write_and_read_parquet(
-        prepare_ddf(validation_raw, history_size=64),
-        path=processed_data_path / "validation_prepared.parquet",
-    )
-    logger.info("Data prepared.")
-
-    return train_prepared, validation_prepared
-
-
-def sample_test_histories(
+def _sample_user_histories_by_id(
     user_histories: pd.DataFrame,
     *,
     horizon_time: datetime,
@@ -372,67 +299,83 @@ def sample_test_histories(
     return user_histories_sample
 
 
-def prepare_test_data(
+def sample_user_histories_by_id(
     ddf: dd.DataFrame,  # type: ignore
     *,
     horizon_time: datetime,
     history_size: int,
-) -> pd.DataFrame:  # type: ignore
-    logger.info("Preparing meta for sampling user histories")
-    meta = sample_test_histories(
+) -> dd.DataFrame:  # type: ignore
+    meta = _sample_user_histories_by_id(
         ddf.head(2, npartitions=-1),
         horizon_time=horizon_time,
         history_size=history_size,
     )
-    logger.info("Sampling user histories")
-    sampled_data = ddf.map_partitions(
-        sample_test_histories,
+    return ddf.map_partitions(
+        _sample_user_histories_by_id,
         horizon_time=horizon_time,
         history_size=history_size,
         meta=meta,
     )
 
-    return sampled_data
+
+def split_train_val_test(
+    ddf: dd.DataFrame,  # type: ignore
+    *,
+    latest_event_time: datetime,
+    split_ratio: float = 0.8,
+    churn_time: timedelta = timedelta(days=28),
+) -> tuple[dd.DataFrame, dd.DataFrame, dd.DataFrame]:  # type: ignore
+    train_val = ddf[ddf["OccurredTime"] < latest_event_time - churn_time]
+    train, validation = split_data(train_val, split_ratio=split_ratio)
+
+    test = remove_without_history(ddf, time_treshold=latest_event_time - 2 * churn_time)
+
+    return train, validation, test
 
 
-def preprocess_test(raw_data_path: Path, processed_data_path: Path) -> dd.DataFrame:  # type: ignore
-    # Read raw data
-    logger.info("Reading raw data...")
-    raw_data = dd.read_parquet(raw_data_path)  # type: ignore
-    logger.info("Raw data read.")
+def _preprocess_dataset(
+    *,
+    raw_data_path: Path,
+    processed_data_path: Path,
+    churn_time: timedelta = timedelta(days=28),
+    history_size: int = 64,
+) -> tuple[dd.DataFrame, dd.DataFrame, dd.DataFrame]:  # type: ignore
+    raw_data = dd.read_parquet(raw_data_path, calculate_divisions=True)  # type: ignore
 
-    # Calculate time threshold
-    logger.info("Calculating max time...")
-    time_stats = raw_data["OccurredTime"].describe().compute()
-    max_time = datetime.strptime(time_stats["max"], "%Y-%m-%d %H:%M:%S.%f")
-    logger.info("Max time calculated.")
-
-    logger.info("Removing users without history...")
-    data_before_horizon = remove_without_history(
-        raw_data,
-        time_treshold=max_time - timedelta(days=28),
-        latest_event_delta=timedelta(days=28),
+    latest_event_time = convert_datetime(
+        raw_data["OccurredTime"].describe().compute()["max"]
     )
-    data_before_horizon = write_and_read_parquet(
-        data_before_horizon,
-        path=processed_data_path / "test_data_before_horizon.parquet",
+    earliest_event_time = convert_datetime(
+        raw_data["OccurredTime"].describe().compute()["min"]
     )
-    logger.info("Users without history removed at preprocess_test.")
 
-    # Prepare data
-    logger.info("Preparing data...")
-    data_prepared = prepare_test_data(
-        data_before_horizon.repartition(partition_size="5MB"),
-        history_size=64,
-        horizon_time=max_time - timedelta(days=28),
+    train, validation, test = split_train_val_test(
+        raw_data, latest_event_time=latest_event_time, churn_time=churn_time
     )
-    data_prepared = write_and_read_parquet(
-        data_prepared,
-        path=processed_data_path / "test_prepared.parquet",
-    )
-    logger.info("Data prepared.")
 
-    return data_prepared
+    train = sample_user_histories_by_time(
+        train,
+        history_size=history_size,
+        min_time=earliest_event_time,
+        max_time=latest_event_time - 2 * churn_time,
+    )
+    validation = sample_user_histories_by_time(
+        validation,
+        history_size=history_size,
+        min_time=earliest_event_time,
+        max_time=latest_event_time - 2 * churn_time,
+    )
+    test = sample_user_histories_by_id(
+        test, horizon_time=latest_event_time - churn_time, history_size=history_size
+    )
+
+    train = write_and_read_parquet(train, path=processed_data_path / "train.parquet")
+    validation = write_and_read_parquet(
+        validation, path=processed_data_path / "validation.parquet"
+    )
+    test = write_and_read_parquet(test, path=processed_data_path / "test.parquet")
+
+    return train, validation, test
 
 
 def calculate_vocab(
@@ -488,10 +431,11 @@ def preprocess_dataset(raw_data_path: Path, processed_data_path: Path) -> None:
             dd.read_parquet(raw_data_path),  # type: ignore
             processed_data_path=processed_data_path,
         )
-        logger.info("Preprocessing test data...")
-        preprocess_test(raw_data_path, processed_data_path)
-        logger.info("Preprocessing train/validation data...")
-        preprocess_train_validation(raw_data_path, processed_data_path)
+        logger.info("Preprocessing dataset...")
+        _preprocess_dataset(
+            raw_data_path=raw_data_path,
+            processed_data_path=processed_data_path,
+        )
     finally:
         client.close()  # type: ignore
         cluster.close()  # type: ignore
