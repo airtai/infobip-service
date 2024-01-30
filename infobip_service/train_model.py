@@ -47,7 +47,7 @@ def _run_training_loop(
                 total_loss += loss.item()
 
         average_loss = total_loss / len(validation_dataset)
-        print(f"Epoch: {epoch}, Average Validation Loss: {average_loss}")
+        print(f"Epoch: {epoch}, Average Validation Loss: {average_loss}")  # noqa
 
     return model
 

@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -73,7 +74,7 @@ def test_bin_next_event_user_history():
 
 @pytest.mark.skip(reason="Dataset not available on CI/CD")
 def test_train_dataset():
-    with open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
+    with Path.open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
         vocab = json.load(f)
 
     train_dataset = UserHistoryDataset(
@@ -89,7 +90,7 @@ def test_train_dataset():
 
 @pytest.mark.skip(reason="Dataset not available on CI/CD")
 def test_test_dataset():
-    with open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
+    with Path.open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
         vocab = json.load(f)
 
     test_dataset = UserHistoryDataset(
@@ -105,7 +106,7 @@ def test_test_dataset():
 
 @pytest.mark.skip(reason="Dataset not available on CI/CD")
 def test_val_dataset():
-    with open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
+    with Path.open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
         vocab = json.load(f)
 
     val_dataset = UserHistoryDataset(

@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -18,10 +19,10 @@ from infobip_service.preprocessing import processed_data_path
 
 @pytest.mark.skip(reason="Dataset not available on CI/CD")
 def test_model_forward():
-    with open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
+    with Path.open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
         vocab = json.load(f)
 
-    with open(processed_data_path / "time_stats.json", "rb") as f:
+    with Path.open(processed_data_path / "time_stats.json", "rb") as f:
         time_stats = json.load(f)
 
     dataset = DataLoader(
@@ -80,10 +81,10 @@ def test_churn():
 
 @pytest.mark.skip(reason="Dataset not available on CI/CD")
 def test_churn_probaility_model():
-    with open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
+    with Path.open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
         vocab = json.load(f)
 
-    with open(processed_data_path / "time_stats.json", "rb") as f:
+    with Path.open(processed_data_path / "time_stats.json", "rb") as f:
         time_stats = json.load(f)
 
     dataset = DataLoader(

@@ -70,7 +70,7 @@ def calculate_predictions(
 
 def graph_hit_rate(
     model_predictions: pd.DataFrame,
-    slices: list[float] = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0],
+    slices: list[float] = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0],  # noqa
 ) -> None:
     model_predictions.sort_values("churn_probability", inplace=True)
 
