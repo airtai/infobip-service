@@ -74,8 +74,6 @@ user_histories_df["ApplicationId"] = user_histories_df["ApplicationId"].astype(
 
 def test_model_predict():
     with tempfile.TemporaryDirectory() as tmpdirname:
-        tmpdirname = Path("test_data")
-        tmpdirname.mkdir(exist_ok=True)
         raw_data_path = Path(tmpdirname) / "user_histories.parquet"
         processed_data_path = Path(tmpdirname) / "processed"
 
