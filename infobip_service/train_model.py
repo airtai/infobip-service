@@ -9,6 +9,8 @@ from infobip_service.load_dataset import UserHistoryDataset
 from infobip_service.model import ChurnModel  # type: ignore
 from infobip_service.preprocessing import processed_data_path
 
+model_path = Path() / ".." / "models" / "model.pt"
+
 
 def _run_training_loop(
     model: ChurnModel,
@@ -20,8 +22,8 @@ def _run_training_loop(
 ) -> torch.nn.Module:
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    loss_fn = torch.nn.CrossEntropyLoss()
-    for _ in range(epochs):
+    loss_fn = torch.nn.NLLLoss()
+    for epoch in range(epochs):
         model.train()
         for batch in tqdm(train_dataset):
             optimizer.zero_grad()
@@ -44,8 +46,8 @@ def _run_training_loop(
                 loss = loss_fn(y_pred, y)
                 total_loss += loss.item()
 
-        # average_loss = total_loss / len(validation_dataset)
-        # print(f"Epoch: {epoch}, Average Validation Loss: {average_loss}")
+        average_loss = total_loss / len(validation_dataset)
+        print(f"Epoch: {epoch}, Average Validation Loss: {average_loss}")
 
     return model
 
@@ -64,7 +66,7 @@ def train_model(
             UserHistoryDataset(
                 processed_data_path / f"{k}_prepared.parquet", definitionId_vocab=vocab
             ),
-            batch_size=1,
+            batch_size=16,
             num_workers=32,
             pin_memory=True,
         )
@@ -91,4 +93,6 @@ def train_model(
 
 
 if __name__ == "__main__":
-    train_model(processed_data_path)
+    model = train_model(processed_data_path)
+    model_path.parent.mkdir(exist_ok=True)
+    torch.save(model.state_dict(), model_path)
