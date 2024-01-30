@@ -1,14 +1,20 @@
 import logging
 import tempfile
 from contextlib import contextmanager
+from datetime import datetime
 from os import environ
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 from urllib.parse import quote_plus as urlquote
 
 import dask.dataframe as dd
 import pandas as pd
 from sqlalchemy.engine import Connection, create_engine
+
+from infobip_service.logger import get_logger, supress_timestamps
+
+supress_timestamps(False)
+logger = get_logger(__name__)
 
 raw_data_path = Path() / ".." / "data" / "raw"
 
@@ -65,7 +71,7 @@ def create_db_uri_for_clickhouse_datablob(
     return clickhouse_uri
 
 
-def get_clickhouse_params_from_env_vars() -> Dict[str, Union[str, int]]:
+def get_clickhouse_params_from_env_vars() -> dict[str, str | int]:
     return {
         "username": environ["KAFKA_CH_USERNAME"],
         "password": environ["KAFKA_CH_PASSWORD"],
@@ -105,13 +111,13 @@ def get_clickhouse_connection(  # type: ignore
         yield connection
 
 
-def fillna(s: Optional[Any]) -> str:
+def fillna(s: Any | None) -> str:
     quote = "'"
     return f"{quote + ('' if s is None else str(s)) + quote}"
 
 
 def _pandas2dask_map(
-    df: pd.DataFrame, *, history_size: Optional[int] = None
+    df: pd.DataFrame, *, history_size: int | None = None
 ) -> pd.DataFrame:
     df = df.reset_index()
     df = df.sort_values(["PersonId", "OccurredTime", "OccurredTimeTicks"])
@@ -121,7 +127,7 @@ def _pandas2dask_map(
 
 
 def _pandas2dask(
-    downloaded_path: Path, output_path: Path, *, history_size: Optional[int] = None
+    downloaded_path: Path, output_path: Path, *, history_size: int | None = None
 ) -> None:
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
@@ -146,9 +152,9 @@ def _pandas2dask(
 
 def _download_account_id_rows_as_parquet(
     *,
-    account_id: Union[int, str],
-    application_id: Optional[str],
-    history_size: Optional[int] = None,
+    account_id: int | str,
+    application_id: str | None,
+    history_size: int | None = None,
     host: str,
     port: int,
     username: str,
@@ -156,7 +162,7 @@ def _download_account_id_rows_as_parquet(
     database: str,
     protocol: str,
     table: str,
-    chunksize: Optional[int] = 1_000_000,
+    chunksize: int | None = 1_000_000,
     output_path: Path,
 ) -> None:
     with get_clickhouse_connection(  # type: ignore
@@ -200,11 +206,10 @@ def _download_account_id_rows_as_parquet(
 
 def download_account_id_rows_as_parquet(
     *,
-    account_id: Union[int, str],
-    application_id: Optional[str],
-    history_size: Optional[int] = None,
-    chunksize: Optional[int] = 1_000_000,
-    index_column: str = "PersonId",
+    account_id: int | str,
+    application_id: str | None,
+    history_size: int | None = None,
+    chunksize: int | None = 1_000_000,
     output_path: Path,
 ) -> None:
     db_params = get_clickhouse_params_from_env_vars()
@@ -214,7 +219,6 @@ def download_account_id_rows_as_parquet(
         application_id=application_id,
         history_size=history_size,
         chunksize=chunksize,
-        index_column=index_column,
         output_path=output_path,
         **db_params,  # type: ignore
     )
@@ -235,3 +239,108 @@ if __name__ == "__main__":
 
     ddf = dd.read_parquet(raw_data_path)  # type: ignore
     logging.info(f"{ddf.shape[0].compute()=:,d}")
+
+
+def _get_unique_account_ids_model_ids(
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    database: str,
+    protocol: str,
+    table: str,
+) -> list[dict[str, int]]:
+    connection: Connection
+    with get_clickhouse_connection(
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        database=database,
+        table=table,
+        protocol=protocol,
+    ) as connection:
+        query = f"select DISTINCT on (AccountId, ModelId, ApplicationId) AccountId, ModelId, ApplicationId from {table}"  # nosec B608:hardcoded_sql_expressions
+        df = pd.read_sql(sql=query, con=connection)
+    return df.to_dict("records")  # type: ignore
+
+
+def get_unique_account_ids_model_ids() -> list[dict[str, int]]:
+    db_params = get_clickhouse_params_from_env_vars()
+    # Replace infobip_data with infobip_start_training_data for table param
+    db_params["table"] = "infobip_start_training_data"
+    return _get_unique_account_ids_model_ids(**db_params)  # type: ignore
+
+
+def _get_count_for_account_id(
+    account_id: int | str,
+    username: str,
+    password: str,
+    host: str,
+    port: int,
+    database: str,
+    table: str,
+    protocol: str,
+) -> tuple[int | None, datetime | None]:
+    """Function to get count for the given account ids from given table.
+
+    Args:
+        account_id: account id
+        username: Username of clickhouse database
+        password: Password of clickhouse database
+        host: Host of clickhouse database
+        port: Port of clickhouse database
+        table: Table of clickhouse database
+        database: Database to use
+        protocol: Protocol to connect to clickhouse (native/http)
+
+    Returns:
+        A pair containing count and timestamp from the db
+    """
+    with get_clickhouse_connection(  # type: ignore
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        database=database,
+        table=table,
+        protocol=protocol,
+    ) as connection:
+        if not type(connection) == Connection:
+            raise ValueError(f"{type(connection)=} != Connection")
+
+        # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+        query = (
+            f"SELECT AccountId, count() as count, now() as now FROM {database}.{table} "  # nosec B608
+            + f"WHERE AccountId={account_id} "
+            + "GROUP BY AccountId "
+        )
+
+        logger.info(f"Getting count with query={query}")
+
+        # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+        result = connection.exec_driver_sql(query).fetchall()  # type: ignore
+
+        if len(result) == 0:
+            return (None, None)
+        elif len(result) == 1:
+            return (result[0][-2], result[0][-1])
+        else:
+            raise RuntimeError(
+                f"More than one result returned from the database: {result}"
+            )
+
+
+def get_count_for_account_id(
+    account_id: int | str,
+) -> tuple[int | None, datetime | None]:
+    """Get count of all rows for given account ids from clickhouse table.
+
+    Args:
+        account_id: Account id
+
+    Returns:
+        Count for the given account id
+    """
+    db_params = get_clickhouse_params_from_env_vars()
+    return _get_count_for_account_id(account_id=account_id, **db_params)  # type: ignore [arg-type]
