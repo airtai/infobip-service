@@ -8,7 +8,7 @@ from faststream import FastStream
 from faststream.kafka import KafkaBroker
 from faststream.security import SASLScram256
 
-from infobip_service.download import download_account_id_rows_as_parquet
+from infobip_service.dataset.download import download_account_id_rows_as_parquet
 from infobip_service.kafka_server import TrainingModelStart, TrainingModelStatus
 from infobip_service.logger import get_logger, supress_timestamps
 

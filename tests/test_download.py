@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 from sqlalchemy.engine import Connection
 
-from infobip_service.download import (
+from infobip_service.dataset.download import (
     _create_clickhouse_connection_string,
     _pandas2dask,
     _pandas2dask_map,
@@ -294,7 +294,7 @@ def test_get_unique_account_ids_model_ids(monkeypatch):
 
     # from infobip_service.download import pd
     monkeypatch.setattr(
-        "infobip_service.download.get_clickhouse_connection",
+        "infobip_service.dataset.download.get_clickhouse_connection",
         mock_get_clickhouse_connection,
     )
     monkeypatch.setattr(pd, "read_sql", mock_read_sql)

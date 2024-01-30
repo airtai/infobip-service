@@ -13,7 +13,7 @@ from faststream import FastStream
 from faststream.kafka import KafkaBroker
 from faststream.security import SASLScram256
 
-from infobip_service.download import (
+from infobip_service.dataset.download import (
     download_account_id_rows_as_parquet,
     get_count_for_account_id,
 )
@@ -340,7 +340,7 @@ async def train(
     #     timestamp=datetime.now(),
     #     auc=accuracy,
     #     recall=0.0,
-    #     precission=0.0,
+    #     precision=0.0,
     #     accuracy=accuracy,
     #     f1=0.0,
     # )

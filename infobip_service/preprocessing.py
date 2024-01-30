@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from dask.distributed import Client, LocalCluster
 
-from infobip_service.download import raw_data_path
+from infobip_service.dataset.download import raw_data_path
 from infobip_service.logger import get_logger, supress_timestamps
 
 supress_timestamps(False)

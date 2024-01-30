@@ -9,7 +9,7 @@ from rocketry import Rocketry
 from rocketry.conds import daily, weekly
 from rocketry.log import TaskRunRecord
 
-from infobip_service.download import get_unique_account_ids_model_ids
+from infobip_service.dataset.download import get_unique_account_ids_model_ids
 from infobip_service.helpers import (
     get_aio_kafka_config,
 )
