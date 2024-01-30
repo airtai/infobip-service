@@ -7,10 +7,13 @@ import numpy as np
 import pandas as pd
 import torch
 
-from infobip_service.load_dataset import embed_vocab
+from infobip_service.dataset.load_dataset import embed_vocab
+from infobip_service.dataset.preprocessing import (
+    _create_user_history,
+    preprocess_dataset,
+)
 from infobip_service.model import ChurnProbabilityModel  # type: ignore
-from infobip_service.preprocessing import _create_user_history, preprocess_dataset
-from infobip_service.train_model import train_model
+from infobip_service.model.train_model import train_model
 
 
 def prepare_user_history(

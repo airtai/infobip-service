@@ -5,12 +5,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from infobip_service.load_dataset import (
+from infobip_service.dataset.load_dataset import (
     UserHistoryDataset,
     _bin_timedelta,
     bin_next_event_user_history,
 )
-from infobip_service.preprocessing import processed_data_path
+from infobip_service.dataset.preprocessing import processed_data_path
 
 user_history = pd.DataFrame(
     {

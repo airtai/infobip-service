@@ -5,7 +5,7 @@ import dask.dataframe as dd
 import pandas as pd
 import pytest
 
-from infobip_service.preprocessing import (
+from infobip_service.dataset.preprocessing import (
     _get_next_event,
     _remove_without_history,
     _sample_time_map,

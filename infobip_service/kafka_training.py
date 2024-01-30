@@ -17,6 +17,7 @@ from infobip_service.dataset.download import (
     download_account_id_rows_as_parquet,
     get_count_for_account_id,
 )
+from infobip_service.dataset.preprocessing import preprocess_dataset
 from infobip_service.infobip_model_api import TimeSeriesDownstreamSolution
 from infobip_service.kafka_server import (
     ModelMetrics,
@@ -29,7 +30,6 @@ from infobip_service.kafka_server import (
     TrainingModelStatus,
 )
 from infobip_service.logger import get_logger, supress_timestamps
-from infobip_service.preprocessing import preprocess_dataset
 
 supress_timestamps(False)
 logger = get_logger(__name__)

@@ -5,7 +5,7 @@ from typing import Any
 import torch
 from scipy import interpolate
 
-from infobip_service.load_dataset import buckets
+from infobip_service.dataset.load_dataset import buckets
 
 from .category_embedding import build_embedding_layer_category
 from .time_embedding import build_embedding_layer_time

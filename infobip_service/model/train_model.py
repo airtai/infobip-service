@@ -5,9 +5,9 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from infobip_service.load_dataset import UserHistoryDataset
+from infobip_service.dataset.load_dataset import UserHistoryDataset
+from infobip_service.dataset.preprocessing import processed_data_path
 from infobip_service.model import ChurnModel  # type: ignore
-from infobip_service.preprocessing import processed_data_path
 
 model_path = Path() / ".." / "models" / "model.pt"
 

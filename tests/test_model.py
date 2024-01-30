@@ -7,14 +7,14 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from infobip_service.load_dataset import UserHistoryDataset
+from infobip_service.dataset.load_dataset import UserHistoryDataset
+from infobip_service.dataset.preprocessing import processed_data_path
 from infobip_service.model import ChurnModel, ChurnProbabilityModel
 from infobip_service.model.churn_model import (
     cdf_after_x_days,
     churn,
     interpolate_cdf_from_pdf,
 )
-from infobip_service.preprocessing import processed_data_path
 
 
 @pytest.mark.skip(reason="Dataset not available on CI/CD")

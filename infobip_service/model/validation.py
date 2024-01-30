@@ -8,10 +8,10 @@ import torch
 import tqdm
 from torch.utils.data import DataLoader
 
-from infobip_service.load_dataset import UserHistoryDataset
+from infobip_service.dataset.load_dataset import UserHistoryDataset
+from infobip_service.dataset.preprocessing import processed_data_path
 from infobip_service.model import ChurnModel, ChurnProbabilityModel  # type: ignore
-from infobip_service.preprocessing import processed_data_path
-from infobip_service.train_model import model_path
+from infobip_service.model.train_model import model_path
 
 calculated_predictions_path = processed_data_path / "predictions.parquet"
 
