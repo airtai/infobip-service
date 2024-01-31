@@ -353,6 +353,10 @@ def _preprocess_dataset(
         raw_data, latest_event_time=latest_event_time, churn_time=churn_time
     )
 
+    train = train.repartition(partition_size="5MB")
+    validation = validation.repartition(partition_size="5MB")
+    test = test.repartition(partition_size="5MB")
+
     train = sample_user_histories_by_time(
         train,
         history_size=history_size,

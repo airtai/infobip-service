@@ -260,3 +260,6 @@ omit = [
 [tool.bandit]
 
 [tool.codespell]
+
+[project.scripts]
+infobip-service = "infobip_service.cli:app"
