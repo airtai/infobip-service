@@ -125,7 +125,7 @@ def test_sample_time_map_ddf():
 
 def test_remove_without_history_df():
     result = _remove_without_history(
-        user_histories_df, time_treshold=datetime(2023, 7, 12)
+        user_histories_df, time_treshold=datetime(2023, 7, 12), latest_event_delta=timedelta(days=28)
     )
 
     expected = pd.DataFrame(

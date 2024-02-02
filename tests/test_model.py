@@ -73,9 +73,9 @@ def test_churn():
     buckets = [1, 5, 28]
 
     for i in np.linspace(1, 28, 100):
-        assert 0 <= churn(pdf, days=i, time_to_churn=28, buckets=buckets) <= 1
-        assert churn(pdf, days=i - 1, time_to_churn=28, buckets=buckets) <= churn(
-            pdf, days=i, time_to_churn=28, buckets=buckets
+        assert 0 <= churn(pdf, days=i, time_to_churn=28, bins=buckets) <= 1
+        assert churn(pdf, days=i - 1, time_to_churn=28, bins=buckets) <= churn(
+            pdf, days=i, time_to_churn=28, bins=buckets
         )
 
 

@@ -2,7 +2,9 @@ import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from random import choice, randrange
-from typing import Any
+import shutil
+from tempfile import TemporaryDirectory
+from typing import Any, Optional, Tuple
 
 import dask.dataframe as dd
 import numpy as np
@@ -19,14 +21,16 @@ processed_data_path = Path() / ".." / "data" / "processed"
 
 # Dataset preparation
 
-
 def write_and_read_parquet(
     ddf: dd.DataFrame,  # type: ignore
     *,
     path: Path,
     **kwargs: Any,
 ) -> dd.DataFrame:  # type: ignore
+    ts = datetime.now()
+    logger.info(f"Writing to {path}...")
     ddf.to_parquet(path, **kwargs)
+    logger.info(f" - completed writing to {path} in {datetime.now() - ts}")
     return dd.read_parquet(path, calculate_divisions=True)  # type: ignore
 
 
@@ -43,38 +47,134 @@ def sample_time_map(ddf: dd.DataFrame, *, time_treshold: datetime) -> dd.DataFra
 def _remove_without_history(
     df: pd.DataFrame,
     *,
-    time_treshold: datetime,
-    latest_event_delta: timedelta | None = None,
+    from_time: datetime,
+    to_time: datetime,
 ) -> pd.DataFrame:
-    if latest_event_delta is not None:
-        indexes_with_history = df[
-            (df["OccurredTime"] < time_treshold)
-            & (df["OccurredTime"] > time_treshold - latest_event_delta)
-        ].index
-    else:
-        indexes_with_history = df[df["OccurredTime"] < time_treshold].index
+    indexes_with_history = df[
+        (df["OccurredTime"] < to_time)
+        & (df["OccurredTime"] >= from_time)
+    ].index
+
     return df[df.index.isin(indexes_with_history)]
 
 
 def remove_without_history(
     ddf: dd.DataFrame,  # type: ignore
     *,
-    time_treshold: datetime,
-    latest_event_delta: timedelta | None = None,
+    from_time: datetime,
+    to_time: timedelta | None = None,
 ) -> dd.DataFrame:  # type: ignore
     meta = _remove_without_history(
-        ddf._meta, time_treshold=time_treshold, latest_event_delta=latest_event_delta
+        ddf._meta, from_time=from_time, to_time=to_time
     )
     return ddf.map_partitions(
         _remove_without_history,
-        time_treshold=time_treshold,
         meta=meta,
-        latest_event_delta=latest_event_delta,
+        from_time=from_time,
+        to_time=to_time,
     )
 
 
-## Train/test split
+# Sample construction
 
+def calculate_occured_timedelta(df: pd.DataFrame, t_max: datetime, churn_time: np.datetime64 = np.timedelta64(28, 'D')) -> pd.DataFrame:
+    xs = df["OccurredTime"].values
+    x_max = np.max(xs)
+
+    df["OccurredTimeDelta"] = np.concatenate([xs[1:] - xs[:-1], [x_max - xs[-1]]])
+    
+    ix = np.concatenate([df["PersonId"].values[1:] == df["PersonId"].values[:-1], [False]])
+    df.loc[~ix, "OccurredTimeDelta"] = np.where((t_max - df.loc[~ix, "OccurredTime"]) < churn_time, np.timedelta64("NaT"), churn_time)
+    
+    return df
+
+def calculate_choice_probabilities(df: pd.DataFrame) -> pd.DataFrame:
+    p = np.where(df["OccurredTimeDelta"].isna(), 0, df["OccurredTimeDelta"]).astype(int) * 1e-12
+    p = p / np.sum(p)
+    df["Probability"] = p
+    return df
+
+def get_chosen_indexes(df: pd.DataFrame, *, num_choices: int) -> int:
+    return np.random.choice(len(df["Probability"]), size=num_choices, replace=True, p=df["Probability"].values)
+
+def get_histories_mask(df, ix, history_size):
+    ih = np.arange(history_size) - history_size + 1
+    ixx = (ix.reshape(-1, 1) + ih.reshape(1, -1)).reshape(-1)
+    mask = np.zeros_like(ixx, dtype=bool)
+
+    df.loc[:, "HasHistory"] = True
+
+    user_ids = df.iloc[ixx]["PersonId"].values
+
+    i = np.arange(history_size-1, len(ixx), history_size)
+    for j in range(1, history_size):
+        mask[i-j] = (user_ids[i-j+1] != user_ids[i-j]) | mask[i-j+1]
+
+    df = df.iloc[ixx]
+    for c in df.columns:
+        if c in ["PersonId", "AccountId", "HasHistory"]:
+            continue
+        df.loc[mask, c] = -1 if pd.api.types.is_integer_dtype(df[c]) else np.nan
+
+    users_id = df["PersonId"].values
+    df.loc[:, "PersonId"] = np.broadcast_to(users_id.reshape((-1, history_size))[:, -1], users_id.reshape(history_size, -1).shape).T.flatten()
+    df.loc[:, "HasHistory"] = ~mask.flatten()
+
+    return df
+
+def sample_dataframe_by_time(df: pd.DataFrame, *, history_size: int, t_max: datetime, churn_time: timedelta = timedelta(days=28), num_choices: int | None = None) -> pd.DataFrame:
+    df = df.reset_index()
+    df = calculate_occured_timedelta(df, t_max - churn_time)
+    df = calculate_choice_probabilities(df)
+    if num_choices is None:
+        num_choices = len(df) // history_size
+    ix = get_chosen_indexes(df, num_choices=num_choices)
+    df = get_histories_mask(df, ix, history_size=history_size)
+    return df
+
+def sample_dataframe_by_time_ddf(ddf: dd.DataFrame, *, history_size: int, t_max: datetime, churn_time: timedelta = timedelta(days=28)) -> dd.DataFrame:
+    meta_sample = ddf.partitions[-1].compute()
+    meta = sample_dataframe_by_time(meta_sample, num_choices=1, history_size=history_size, t_max=meta_sample["OccurredTime"].max(), churn_time=churn_time)
+
+    return ddf.map_partitions(
+        sample_dataframe_by_time,
+        history_size=history_size,
+        t_max=t_max,
+        churn_time=churn_time,
+        meta=meta,
+    )
+
+def get_last_valid_person_indexes(df: pd.DataFrame) -> np.ndarray:
+    valid_events = df["Probability"] != 0.0
+    
+    user_ids = df["PersonId"].values
+    
+    without_invalid = np.where(valid_events, user_ids, -1)
+    breaks = np.concatenate([without_invalid[1:] != without_invalid[:-1], [True]])
+    
+    return np.where(breaks & valid_events)[0]
+
+def sample_dataframe_by_user_id(df: pd.DataFrame, *, history_size: int, t_max: datetime, churn_time: timedelta = timedelta(days=28)) -> pd.DataFrame:
+    df = df.reset_index()
+    df = calculate_occured_timedelta(df, t_max - churn_time)
+    df = calculate_choice_probabilities(df)
+    ix = get_last_valid_person_indexes(df)
+    df = get_histories_mask(df, ix, history_size=history_size)
+    return df
+
+def sample_dataframe_by_user_id_ddf(ddf: dd.DataFrame, *, history_size: int, t_max: datetime, churn_time: timedelta = timedelta(days=28)) -> dd.DataFrame:
+    meta_sample = ddf.partitions[-1].compute()
+    meta = sample_dataframe_by_user_id(meta_sample, history_size=history_size, t_max=meta_sample["OccurredTime"].max(), churn_time=churn_time)
+
+    return ddf.map_partitions(
+        sample_dataframe_by_user_id,
+        history_size=history_size,
+        t_max=t_max,
+        churn_time=churn_time,
+        meta=meta,
+    )
+
+## Train/test split
 
 def split_data(
     ddf: dd.DataFrame,  # type: ignore
@@ -92,243 +192,17 @@ def split_data(
 
     return train_data, validation_data
 
-
-# Sample construction
-
-## Next event
-
-
-def _get_next_event(df: pd.DataFrame, *, t0: datetime) -> pd.DataFrame:
-    _df = df[df["OccurredTime"] >= t0]
-    return pd.DataFrame(
-        {
-            "AccountId": [_df["AccountId"].values[0] if len(_df) > 0 else None],
-            "DefinitionId": [_df["DefinitionId"].values[0] if len(_df) > 0 else None],
-            "ApplicationId": [_df["ApplicationId"].values[0] if len(_df) > 0 else None],
-            "OccurredTime": [_df["OccurredTime"].values[0] if len(_df) > 0 else None],
-        },
-        index=pd.Index(["NextEvent"]),
-    ).T
-
-
-def get_next_event(df: pd.DataFrame, *, t0: datetime) -> pd.DataFrame:
-    return df.groupby("PersonId").apply(lambda x: _get_next_event(x, t0=t0))
-
-
-## History construction
-
-
-def pad_left(
-    array_to_pad: np.ndarray,  # type: ignore
-    *,
-    size: int,
-) -> np.ndarray:  # type: ignore
-    return np.pad(array_to_pad, pad_width=(size - len(array_to_pad), 0), mode="empty")
-
-
-def _create_user_history(
-    user_history: pd.DataFrame, *, t0: datetime, history_size: int
-) -> pd.DataFrame:
-    user_history = user_history[user_history["OccurredTime"] < t0]
-    user_history = user_history.sort_values(by="OccurredTime", ascending=False)
-    user_history = user_history.head(history_size)
-    user_history = user_history.sort_values(by="OccurredTime")
-
-    reconstructed_history = pd.DataFrame(
-        {
-            "AccountId": pad_left(user_history["AccountId"].values, size=history_size),
-            "DefinitionId": pad_left(
-                user_history["DefinitionId"].values, size=history_size
-            ),
-            "ApplicationId": pad_left(
-                user_history["ApplicationId"].values, size=history_size
-            ),
-            "OccurredTime": pad_left(
-                user_history["OccurredTime"].values, size=history_size
-            ),
-        },
-        index=pd.Index([f"h_{i}" for i in range(history_size)], name="HistoryId"),
-    ).T
-
-    return reconstructed_history
-
-
-def create_user_histories(
-    user_histories: pd.DataFrame, *, t0: datetime, history_size: int
-) -> pd.DataFrame:
-    return user_histories.groupby("PersonId").apply(
-        lambda x: _create_user_history(x, t0=t0, history_size=history_size)
-    )
-
-
-## Dataset sampling
-
-
-def random_date(start: datetime, end: datetime) -> datetime:
-    delta = end - start
-    int_delta = (delta.days * 24 * 60 * 60) + delta.seconds
-    try:
-        random_second = randrange(int_delta)  # nosec
-    except ValueError:
-        return end
-    return start + timedelta(seconds=random_second)
-
-
-def convert_datetime(time: str | pd.Timestamp) -> datetime:
-    if isinstance(time, pd.Timestamp):
-        return time.to_pydatetime()  # type: ignore
-    try:
-        return datetime.strptime(time, "%Y-%m-%d %H:%M:%S")
-    except ValueError:
-        return datetime.strptime(time, "%Y-%m-%d %H:%M:%S.%f")
-
-
-def _sample_user_histories_by_time(
-    user_histories: pd.DataFrame,
-    *,
-    min_time: datetime,
-    max_time: datetime,
-    history_size: int,
-) -> pd.DataFrame:
-    num_samples_to_go = len(user_histories) // history_size + 1
-
-    max_time = min(
-        user_histories["OccurredTime"].describe()["max"] + timedelta(days=1), max_time
-    )
-
-    min_time = max(user_histories["OccurredTime"].describe()["min"], min_time)
-
-    user_histories_sample = None
-    while num_samples_to_go > 0:
-        t0 = random_date(min_time, max_time)
-        filtered_index = user_histories[
-            user_histories["OccurredTime"] <= t0
-        ].index.unique()
-        if len(filtered_index) == 0:
-            continue
-        chosen_user_history = user_histories[
-            user_histories.index.isin([choice(filtered_index)])  # nosec
-        ]
-        next_event_timedelta = get_next_event(chosen_user_history, t0=t0)
-        reconstructed_history = create_user_histories(
-            chosen_user_history, t0=t0, history_size=history_size
-        )
-        reconstructed_history = pd.merge(
-            reconstructed_history,
-            next_event_timedelta,
-            left_index=True,
-            right_index=True,
-        )
-        reconstructed_history.index = reconstructed_history.index.map(
-            lambda x, t0=t0: (f"{x[0]}_{t0}", x[1])
-        )
-
-        if user_histories_sample is None:
-            user_histories_sample = reconstructed_history
-        else:
-            user_histories_sample = pd.concat(
-                [user_histories_sample, reconstructed_history]
-            )
-
-        num_samples_to_go -= 1
-
-    logger.info("Partition processed.")
-
-    return user_histories_sample
-
-
-def sample_user_histories_by_time(
-    ddf: dd.DataFrame,  # type: ignore
-    *,
-    min_time: datetime,
-    max_time: datetime,
-    history_size: int,
-) -> pd.DataFrame:
-    sample_for_meta = ddf.head(2, npartitions=-1)
-
-    meta = _sample_user_histories_by_time(
-        sample_for_meta,
-        min_time=sample_for_meta["OccurredTime"].describe()["min"],
-        max_time=sample_for_meta["OccurredTime"].describe()["max"],
-        history_size=history_size,
-    )
-    sampled_data = ddf.map_partitions(
-        _sample_user_histories_by_time,
-        min_time=min_time,
-        max_time=max_time,
-        history_size=history_size,
-        meta=meta,
-    )
-    return sampled_data
-
-
-def _sample_user_histories_by_id(
-    user_histories: pd.DataFrame,
-    *,
-    horizon_time: datetime,
-    history_size: int,
-) -> pd.DataFrame:
-    filtered_index = user_histories[
-        user_histories["OccurredTime"] < horizon_time
-    ].index.unique()
-
-    user_histories_sample = None
-
-    for index in filtered_index:
-        chosen_user_history = user_histories[
-            user_histories.index.isin([index])  # nosec
-        ]
-        next_event_timedelta = get_next_event(chosen_user_history, t0=horizon_time)
-        reconstructed_history = create_user_histories(
-            chosen_user_history, t0=horizon_time, history_size=history_size
-        )
-        reconstructed_history = pd.merge(
-            reconstructed_history,
-            next_event_timedelta,
-            left_index=True,
-            right_index=True,
-        )
-
-        if user_histories_sample is None:
-            user_histories_sample = reconstructed_history
-        else:
-            user_histories_sample = pd.concat(
-                [user_histories_sample, reconstructed_history]
-            )
-
-    return user_histories_sample
-
-
-def sample_user_histories_by_id(
-    ddf: dd.DataFrame,  # type: ignore
-    *,
-    horizon_time: datetime,
-    history_size: int,
-) -> dd.DataFrame:  # type: ignore
-    meta = _sample_user_histories_by_id(
-        ddf.head(2, npartitions=-1),
-        horizon_time=horizon_time,
-        history_size=history_size,
-    )
-    return ddf.map_partitions(
-        _sample_user_histories_by_id,
-        horizon_time=horizon_time,
-        history_size=history_size,
-        meta=meta,
-    )
-
-
 def split_train_val_test(
     ddf: dd.DataFrame,  # type: ignore
     *,
-    latest_event_time: datetime,
+    t_max: datetime,
     split_ratio: float = 0.8,
     churn_time: timedelta = timedelta(days=28),
-) -> tuple[dd.DataFrame, dd.DataFrame, dd.DataFrame]:  # type: ignore
-    train_val = ddf[ddf["OccurredTime"] < latest_event_time - churn_time]
+) -> Tuple[dd.DataFrame, dd.DataFrame, dd.DataFrame]:  # type: ignore
+    train_val = ddf[ddf["OccurredTime"] < t_max - churn_time]
     train, validation = split_data(train_val, split_ratio=split_ratio)
 
-    test = remove_without_history(ddf, time_treshold=latest_event_time - 2 * churn_time)
+    test = remove_without_history(ddf, from_time=t_max-2*churn_time, to_time=t_max-churn_time)
 
     return train, validation, test
 
@@ -338,48 +212,88 @@ def _preprocess_dataset(
     raw_data_path: Path,
     processed_data_path: Path,
     churn_time: timedelta = timedelta(days=28),
-    history_size: int = 64,
-) -> tuple[dd.DataFrame, dd.DataFrame, dd.DataFrame]:  # type: ignore
-    raw_data = dd.read_parquet(raw_data_path, calculate_divisions=True)  # type: ignore
+    history_size: int = 32,
+    drop_data_before: Optional[datetime] = None,
+) -> Tuple[dd.DataFrame, dd.DataFrame, dd.DataFrame, datetime]:  # type: ignore
+    raw_ddf = dd.read_parquet(raw_data_path, calculate_divisions=True)  # type: ignore
 
-    latest_event_time = convert_datetime(
-        raw_data["OccurredTime"].describe().compute()["max"]
-    )
-    earliest_event_time = convert_datetime(
-        raw_data["OccurredTime"].describe().compute()["min"]
-    )
+    with TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
 
-    train, validation, test = split_train_val_test(
-        raw_data, latest_event_time=latest_event_time, churn_time=churn_time
-    )
+        # convert datetime
+        raw_ddf["OccurredTime"] = dd.to_datetime(raw_ddf["OccurredTime"])
+        raw_with_datetime_ddf = write_and_read_parquet(raw_ddf, path=tmpdir_path / "raw_with_datetime.parquet")
 
-    train = train.repartition(partition_size="5MB")
-    validation = validation.repartition(partition_size="5MB")
-    test = test.repartition(partition_size="5MB")
+        # trim old data
+        if drop_data_before is not None:
+            raw_with_datetime_ddf = raw_with_datetime_ddf[raw_with_datetime_ddf["OccurredTime"] > drop_data_before]
+            raw_with_datetime_ddf = write_and_read_parquet(raw_with_datetime_ddf, path=tmpdir_path / "raw_with_datetime_dropped.parquet")
+            raw_with_datetime_ddf = raw_with_datetime_ddf.repartition(partition_size="100MB")
+            raw_with_datetime_ddf = write_and_read_parquet(raw_with_datetime_ddf, path=tmpdir_path / "raw_with_datetime_dropped_repartitioned.parquet")
+            logger.info(f"Num rows in partition {raw_with_datetime_ddf.partitions[0].shape[0].compute()}")    
 
-    train = sample_user_histories_by_time(
-        train,
-        history_size=history_size,
-        min_time=earliest_event_time,
-        max_time=latest_event_time - 2 * churn_time,
-    )
-    validation = sample_user_histories_by_time(
-        validation,
-        history_size=history_size,
-        min_time=earliest_event_time,
-        max_time=latest_event_time - 2 * churn_time,
-    )
-    test = sample_user_histories_by_id(
-        test, horizon_time=latest_event_time - churn_time, history_size=history_size
-    )
 
-    train = write_and_read_parquet(train, path=processed_data_path / "train.parquet")
-    validation = write_and_read_parquet(
-        validation, path=processed_data_path / "validation.parquet"
-    )
-    test = write_and_read_parquet(test, path=processed_data_path / "test.parquet")
+        logger.info("Calculating max time...")
+        ts = datetime.now()
+        t_max = raw_with_datetime_ddf["OccurredTime"].max().compute()
+        logger.info(f" - max time calculated in {datetime.now() - ts}")
 
-    return train, validation, test
+        logger.info("Splitting train/val/test dataset...")
+        ts = datetime.now()
+        train, validation, test = split_train_val_test(
+            raw_with_datetime_ddf, t_max=t_max, churn_time=churn_time
+        )
+        logger.info(f" - datasets splitted in {datetime.now() - ts}")
+
+        train = write_and_read_parquet(train, path=tmpdir_path / "train-1.parquet")
+        validation = write_and_read_parquet(validation, path=tmpdir_path / "validation-1.parquet")
+        test = write_and_read_parquet(test, path=tmpdir_path / "test-1.parquet")
+
+        train = train.repartition(partition_size="100MB")
+        validation = validation.repartition(partition_size="100MB")
+        test = test.repartition(partition_size="100MB")
+
+        train = write_and_read_parquet(train, path=tmpdir_path / "train-2.parquet")
+        validation = write_and_read_parquet(validation, path=tmpdir_path / "validation-2.parquet")
+        test = write_and_read_parquet(test, path=tmpdir_path / "test-2.parquet")
+
+        train = sample_dataframe_by_time_ddf(
+            train,
+            history_size=history_size,
+            t_max=t_max - churn_time,
+        )
+        validation = sample_dataframe_by_time_ddf(
+            validation,
+            history_size=history_size,
+            t_max=t_max,
+        )
+
+        test = sample_dataframe_by_user_id_ddf(
+            test, 
+            history_size=history_size,
+            t_max=t_max - churn_time,
+        )
+
+        train = write_and_read_parquet(train, path=tmpdir_path / "train.parquet")
+        validation = write_and_read_parquet(
+            validation, path=tmpdir_path / "validation.parquet"
+        )
+        test = write_and_read_parquet(test, path=tmpdir_path / "test.parquet")
+
+        logger.info(f"Copying files to {processed_data_path}...")
+        retval = tuple()
+        for ds_name in ["train.parquet", "validation.parquet", "test.parquet"]:
+            if (processed_data_path / ds_name).exists():
+                if (processed_data_path / ds_name).is_dir():
+                    shutil.rmtree(processed_data_path / ds_name)
+                else:
+                    (processed_data_path / ds_name).unlink()
+            shutil.copytree(tmpdir_path / ds_name, processed_data_path / ds_name)
+            ddf = dd.read_parquet(processed_data_path / ds_name)
+            retval = retval + (ddf, )
+        logger.info(f" - files copied to {processed_data_path}...")
+
+    return retval + (t_max, )
 
 
 def calculate_vocab(
@@ -387,12 +301,7 @@ def calculate_vocab(
     *,
     column: str,
     processed_data_path: Path,
-    churn_time: timedelta = timedelta(days=28),
 ) -> None:
-    latest_event_time = convert_datetime(
-        ddf["OccurredTime"].describe().compute()["max"]
-    )
-    ddf = ddf[ddf["OccurredTime"] < latest_event_time - churn_time]
     vocabulary = list(ddf[column].unique().compute())
     with Path.open(processed_data_path / f"{column}_vocab.json", "w") as f:
         json.dump(vocabulary, f)
@@ -402,12 +311,7 @@ def calculate_time_mean_std(
     ddf: dd.DataFrame,  # type: ignore
     *,
     processed_data_path: Path,
-    churn_time: timedelta = timedelta(days=28),
 ) -> None:
-    latest_event_time = convert_datetime(
-        ddf["OccurredTime"].describe().compute()["max"]
-    )
-    ddf = ddf[ddf["OccurredTime"] < latest_event_time - churn_time]
     time_mean, time_std = (
         ddf["OccurredTime"].compute().mean(),
         ddf["OccurredTime"].std().compute(),
@@ -434,22 +338,24 @@ def preprocess_dataset(raw_data_path: Path, processed_data_path: Path) -> None:
     logger.info("Created processed data path.")
 
     try:
+        logger.info("Preprocessing dataset...")
+        train_ddf, *_ = _preprocess_dataset(
+            raw_data_path=raw_data_path,
+            processed_data_path=processed_data_path,
+        )
+
         logger.info("Calculating vocab...")
         calculate_vocab(
-            dd.read_parquet(raw_data_path),  # type: ignore
+            train_ddf[train_ddf["HasHistory"] == True],  # type: ignore
             column="DefinitionId",
             processed_data_path=processed_data_path,
         )
         logger.info("Calculating time mean and std...")
         calculate_time_mean_std(
-            dd.read_parquet(raw_data_path),  # type: ignore
+            train_ddf[train_ddf["HasHistory"] == True],  # type: ignore
             processed_data_path=processed_data_path,
         )
-        logger.info("Preprocessing dataset...")
-        _preprocess_dataset(
-            raw_data_path=raw_data_path,
-            processed_data_path=processed_data_path,
-        )
+        
     finally:
         client.close()  # type: ignore
         cluster.close()  # type: ignore
