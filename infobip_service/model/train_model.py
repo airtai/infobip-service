@@ -11,9 +11,9 @@ def get_dataloaders(processed_data_path: Path, definition_id_vocabulary: List[st
     return {
         name: DataLoader(
             UserHistoryDataset(processed_data_path / f"{name}.parquet", definition_id_vocabulary=definition_id_vocabulary, time_mean=time_stats["mean"]),
-            batch_size=16,
-            num_workers=8,
-            pin_memory=True,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
         ) for name in ["train", "validation", "test"]
     }
 
