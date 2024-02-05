@@ -81,7 +81,7 @@ lint = [
     "mypy==1.8.0",
     "ruff==0.1.13",
     "bandit==1.7.6",
-    "semgrep==1.56.0",
+    "semgrep==1.59.1",
 ]
 
 test-core = [
