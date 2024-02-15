@@ -1,7 +1,7 @@
+import math
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
-import math
 
 import torch
 from scipy import interpolate
@@ -37,10 +37,12 @@ class ChurnModel(torch.nn.Module):
             output_dim=embedding_dim,
         )
 
-        self.convolutions = torch.nn.ModuleList([
-            torch.nn.Conv1d(2 * embedding_dim, 2 * embedding_dim, 2, stride=2)
-            for _ in range(int(math.sqrt(history_size)))
-        ])
+        self.convolutions = torch.nn.ModuleList(
+            [
+                torch.nn.Conv1d(2 * embedding_dim, 2 * embedding_dim, 2, stride=2)
+                for _ in range(int(math.sqrt(history_size)))
+            ]
+        )
 
         self.linear1 = torch.nn.Linear(2 * embedding_dim, 32)
         self.activation = torch.nn.ELU()
@@ -73,8 +75,8 @@ class ChurnModel(torch.nn.Module):
 def interpolate_cdf_from_pdf(
     pdf: list[float], bins: list[int] = bins
 ) -> Callable[[float], float]:
-    x = [*bins, bins[-1]*1000]
-    y = [sum(pdf[:i]) for i in range(1, len(pdf) + 1)]
+    x = [*bins, bins[-1] * 1000]
+    y = [0.0] + [sum(pdf[:i]) for i in range(1, len(pdf) + 1)]
     f = interpolate.interp1d(x, y)
     return f  # type: ignore
 
@@ -102,13 +104,14 @@ class ChurnProbabilityModel(torch.nn.Module):
     def __init__(
         self,
         churn_model: ChurnModel,
-        time_to_churn: int = bins[-1],
+        bins: list[int] = bins,
     ):
         """Churn model initialization method."""
         super().__init__()
-        self.time_to_churn = time_to_churn
+        self.time_to_churn = bins[-1]
         self.churn_model = churn_model
         self.softmax = torch.nn.Softmax(dim=-1)
+        self.bins = bins
 
     def forward(self, x: torch.Tensor, observed_time: datetime) -> Any:
         event_probabilities = self.softmax(self.churn_model(x).detach())
@@ -116,13 +119,15 @@ class ChurnProbabilityModel(torch.nn.Module):
 
         observed_time = torch.tensor(observed_time.timestamp())
         seconds_from_last_events = (observed_time - last_events_times).float()
-        
+
         combined = torch.cat(  # type: ignore
             [event_probabilities, seconds_from_last_events.unsqueeze(-1)], axis=-1
         )
 
         def calculate_churn_for_row(row: torch.Tensor) -> float:
-            return churn(row[0:-1], row[-1], time_to_churn=self.time_to_churn)
+            return churn(
+                row[0:-1], row[-1], time_to_churn=self.time_to_churn, bins=self.bins
+            )
 
         if len(combined.shape) == 1:
             return torch.tensor(calculate_churn_for_row(combined))  # type: ignore

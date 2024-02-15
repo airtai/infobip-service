@@ -11,7 +11,6 @@ from infobip_service.dataset.load_dataset import UserHistoryDataset
 from infobip_service.dataset.preprocessing import processed_data_path
 from infobip_service.model import ChurnModel, ChurnProbabilityModel
 from infobip_service.model.churn_model import (
-    cdf_after_x_days,
     churn,
     interpolate_cdf_from_pdf,
 )
@@ -48,7 +47,7 @@ def test_model_forward():
 
 def test_interpolate_cdf_from_pdf():
     pdf = [0.1, 0.2, 0.3, 0.4]
-    buckets = [1, 5, 28]
+    buckets = [0, 1, 5, 28]
 
     cdf = interpolate_cdf_from_pdf(pdf, buckets)
 
@@ -57,25 +56,14 @@ def test_interpolate_cdf_from_pdf():
         assert cdf(i - 1) <= cdf(i)
 
 
-def test_cdf_after_x_days():
-    pdf = [0.1, 0.2, 0.3, 0.4]
-    buckets = [1, 5, 28]
-
-    cdf = interpolate_cdf_from_pdf(pdf, buckets)
-
-    for i in np.linspace(5, 28, 100):
-        assert 0 <= cdf_after_x_days(cdf, 5)(i) <= 1
-        assert cdf_after_x_days(cdf, 5)(i - 1) <= cdf_after_x_days(cdf, 5)(i)
-
-
 def test_churn():
     pdf = [0.1, 0.2, 0.3, 0.4]
-    buckets = [1, 5, 28]
+    buckets = [0, 1, 5, 28]
 
     for i in np.linspace(1, 28, 100):
-        assert 0 <= churn(pdf, days=i, time_to_churn=28, bins=buckets) <= 1
-        assert churn(pdf, days=i - 1, time_to_churn=28, bins=buckets) <= churn(
-            pdf, days=i, time_to_churn=28, bins=buckets
+        assert 0 <= churn(pdf, seconds=i, time_to_churn=28, bins=buckets) <= 1
+        assert churn(pdf, seconds=i - 1, time_to_churn=28, bins=buckets) <= churn(
+            pdf, seconds=i, time_to_churn=28, bins=buckets
         )
 
 

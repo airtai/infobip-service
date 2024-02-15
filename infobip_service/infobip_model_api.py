@@ -7,36 +7,12 @@ import numpy as np
 import pandas as pd
 import torch
 
-from infobip_service.dataset.load_dataset import embed_vocab
-from infobip_service.dataset.preprocessing import (
-    _create_user_history,
+from infobip_service.dataset.load_dataset import prepare_sample
+from infobip_service.dataset.preprocessing_buckets import (
     preprocess_dataset,
 )
 from infobip_service.model import ChurnProbabilityModel  # type: ignore
 from infobip_service.model.train_model import train_model
-
-
-def prepare_user_history(
-    user_history: pd.DataFrame, definitionId_vocab: list[str]
-) -> pd.DataFrame:
-    actions = user_history.loc[["DefinitionId"]]
-
-    actions = np.apply_along_axis(  # type: ignore
-        lambda x: embed_vocab(x, definitionId_vocab),  # type: ignore
-        0,
-        actions.to_numpy(),
-    )
-
-    times = user_history.loc[["OccurredTime"]]
-
-    times = times[times.columns].apply(pd.to_datetime).to_numpy()[0]
-
-    return torch.Tensor(
-        np.stack(
-            [actions, times.astype("datetime64[s]").astype("int")],
-            axis=-1,
-        )
-    ).long()
 
 
 class TimeSeriesDownstreamSolution:
@@ -88,10 +64,9 @@ class TimeSeriesDownstreamSolution:
             user_history_raw["OccurredTime"] = pd.to_datetime(
                 user_history_raw["OccurredTime"]
             )
-            user_history = prepare_user_history(
-                _create_user_history(user_history_raw, t0=t0, history_size=64),
-                definitionId_vocab=vocab,
-            )
+
+            # TODO: Prepare user history
+            user_history = None
 
             prediction = pd.DataFrame(
                 {
