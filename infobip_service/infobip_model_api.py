@@ -42,8 +42,8 @@ class TimeSeriesDownstreamSolution:
         prediction_inputs_path: Path,
         t0: datetime = datetime.now(),  # noqa
     ) -> pd.DataFrame:
-        with Path.open(self.processed_data_path / "DefinitionId_vocab.json", "rb") as f:
-            vocab = json.load(f)
+        # with Path.open(self.processed_data_path / "DefinitionId_vocab.json", "rb") as f:
+        #     vocab = json.load(f)
 
         if self.model is None:
             raise ValueError("Model is not trained")

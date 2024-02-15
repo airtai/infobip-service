@@ -69,7 +69,7 @@ def test_sample_dataframe_buckets_last_event():
     assert calculate_bucket_sizes(sampled_ddf, bucket_limits=bucket_limits) == [5, 5]
 
 
-def sample_dataframe_buckets():
+def test_sample_dataframe_buckets():
     test_df = pd.DataFrame(
         {
             "PersonId": [
@@ -103,7 +103,6 @@ def sample_dataframe_buckets():
     sampled_df = sample_dataframe_buckets(
         test_df, bucket_limits=bucket_limits, history_size=1
     )
-    sampled_df
 
 
 def test_calculate_bucket_sizes():

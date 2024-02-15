@@ -452,13 +452,13 @@ def preprocess_dataset(raw_data_path: Path, processed_data_path: Path) -> None:
 
         logger.info("Calculating vocab...")
         calculate_vocab(
-            train_ddf[train_ddf["HasHistory"] == True],  # type: ignore
+            train_ddf[train_ddf["HasHistory"]],  # type: ignore
             column="DefinitionId",
             processed_data_path=processed_data_path,
         )
         logger.info("Calculating time mean and std...")
         calculate_time_mean_std(
-            train_ddf[train_ddf["HasHistory"] == True],  # type: ignore
+            train_ddf[train_ddf["HasHistory"]],  # type: ignore
             processed_data_path=processed_data_path,
         )
 

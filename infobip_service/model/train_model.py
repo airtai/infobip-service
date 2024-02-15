@@ -5,6 +5,10 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from infobip_service.dataset.load_dataset import UserHistoryDataset
+from infobip_service.logger import get_logger, supress_timestamps
+
+supress_timestamps(False)
+logger = get_logger(__name__)
 
 
 def get_dataloaders(
@@ -59,7 +63,7 @@ def evaluate_loss(model, dataloader, loss_fn, device) -> float:
 
 
 def train_model(model, dataloaders, optimizer, loss_fn, device, num_epochs: int = 10):
-    print(
+    logger.info(
         f"Start Loss: {evaluate_loss(model, dataloaders['validation'], loss_fn, device)}"
     )
     for epoch in range(num_epochs):
@@ -67,5 +71,5 @@ def train_model(model, dataloaders, optimizer, loss_fn, device, num_epochs: int 
         validation_loss = evaluate_loss(
             model, dataloaders["validation"], loss_fn, device
         )
-        print(f"Epoch {epoch + 1}, validation loss: {validation_loss:.3f}")
+        logger.info(f"Epoch {epoch + 1}, validation loss: {validation_loss:.3f}")
     return model
