@@ -19,6 +19,6 @@ def test_get_aio_kafka_config(monkeypatch):
         "security_protocol": "SASL_SSL",
         "sasl_mechanism": "SCRAM-SHA-256",
         "sasl_plain_username": "test",
-        "sasl_plain_password": "test",
+        "sasl_plain_password": "test",  # pragma: allowlist secret
     }
     assert actual == expected, actual

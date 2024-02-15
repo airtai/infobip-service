@@ -104,6 +104,8 @@ def test_sample_dataframe_buckets():
         test_df, bucket_limits=bucket_limits, history_size=1
     )
 
+    assert sampled_df.shape[0] == 6, f"{sampled_df.shape[0]:,d} == 6"
+
 
 def test_calculate_bucket_sizes():
     test_df = pd.DataFrame(
