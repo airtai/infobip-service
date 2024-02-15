@@ -33,7 +33,7 @@ bucket_limits = (
 def calculate_occured_timedelta(
     df: pd.DataFrame,
     t_max: datetime,
-    churn_time: np.datetime64 = np.timedelta64(28, "D"),
+    churn_time: np.datetime64 = np.timedelta64(28, "D"), # noqa
 ) -> pd.DataFrame:
     xs = df["OccurredTime"].values
     x_max = np.max(xs)
@@ -67,7 +67,7 @@ def get_bucket_rows(
     df: pd.DataFrame,
     *,
     floor: np.timedelta64,
-    ceil: np.timedelta64 = np.timedelta64("NaT"),
+    ceil: np.timedelta64 = np.timedelta64("NaT"), # noqa
 ) -> np.ndarray:
     if np.isnat(ceil):
         return df[df["OccurredTimeDelta"] >= floor]

@@ -78,7 +78,7 @@ def remove_without_history(
 def calculate_occured_timedelta(
     df: pd.DataFrame,
     t_max: datetime,
-    churn_time: np.datetime64 = np.timedelta64(28, "D"),
+    churn_time: np.datetime64 = np.timedelta64(28, "D"), # noqa
 ) -> pd.DataFrame:
     xs = df["OccurredTime"].values
     x_max = np.max(xs)
