@@ -31,10 +31,10 @@ should_supress_timestamps: bool = False
 
 
 def supress_timestamps(flag: bool = True) -> None:
-    """Supress logger timestamp.
+    """Suppress logger timestamp.
 
     Args:
-        flag: If not set, then the default value **True** will be used to supress the timestamp
+        flag: If not set, then the default value **True** will be used to suppress the timestamp
             from the logger messages
     """
     global should_supress_timestamps

@@ -198,7 +198,7 @@ def _preprocess_dataset(
 
         logger.info(f" - train/val/test dataset split in {datetime.now() - ts}")
 
-        logger.info("Calculating occured time delta...")
+        logger.info("Calculating occurred time delta...")
 
         train_with_timedeltas_ddf = raw_train_ddf.map_partitions(
             calculate_occured_timedelta, t_max=t_max
@@ -243,7 +243,7 @@ def _preprocess_dataset(
             censored_validation_ddf, path=tmpdir_path / "censored_validation.parquet"
         )
 
-        logger.info("Reseting index...")
+        logger.info("Resetting index...")
         censored_train_ddf = censored_train_ddf.reset_index()
         censored_train_ddf = write_and_read_parquet(
             censored_train_ddf, path=tmpdir_path / "censored_train_reset_index.parquet"

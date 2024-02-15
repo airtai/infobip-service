@@ -1,9 +1,4 @@
-import tempfile
-from pathlib import Path
-
 import pandas as pd
-
-from infobip_service.infobip_model_api import TimeSeriesDownstreamSolution
 
 user_histories_df = pd.DataFrame(
     {
