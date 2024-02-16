@@ -12,7 +12,7 @@ bins = [
 
 def prepare_sample(
     df: pd.DataFrame, *, definition_id_vocabulary: list[str], time_mean: float
-) -> np.ndarray: # type: ignore
+) -> np.ndarray:  # type: ignore
     has_history = df["HasHistory"].values
     actions = df["DefinitionId"].values
     embedded_actions = np.ones_like(actions, dtype=int) * len(definition_id_vocabulary)
@@ -53,7 +53,7 @@ class UserHistoryDataset(Dataset):  # type: ignore
     def __len__(self) -> int:
         return len(self.histories) // self.history_size
 
-    def __getitem__(self, idx: int) -> tuple[np.ndarray, int]: # type: ignore
+    def __getitem__(self, idx: int) -> tuple[np.ndarray, int]:  # type: ignore
         history = self.histories.iloc[
             idx * self.history_size : (idx + 1) * self.history_size
         ]
@@ -66,8 +66,8 @@ class UserHistoryDataset(Dataset):  # type: ignore
             np.digitize(
                 history.iloc[-1]["OccurredTimeDelta"].total_seconds(),
                 right=False,
-                bins=self.bins, # type: ignore
+                bins=self.bins,  # type: ignore
             )
             - 1
         )
-        return x, y # type: ignore
+        return x, y  # type: ignore

@@ -3,13 +3,11 @@ import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
 
 import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 from dask.distributed import Client, LocalCluster
-from numpy import dtype, signedinteger
 
 from infobip_service.dataset.preprocessing import (
     calculate_time_mean_std,
@@ -56,7 +54,7 @@ def calculate_occured_timedelta(
     )
 
     df.loc[
-        df["OccurredTime"] > t_max - churn_time, "OccurredTimeDelta" # type: ignore
+        df["OccurredTime"] > t_max - churn_time, "OccurredTimeDelta"  # type: ignore
     ] = np.timedelta64("NaT")
 
     if (df["OccurredTimeDelta"] > churn_time).any():
@@ -106,8 +104,10 @@ def sample_dataframe_buckets(
 
 
 def calculate_bucket_sizes(
-    ddf: dd.DataFrame, *, bucket_limits: List[np.timedelta64] # type: ignore
-) -> dd.DataFrame: # type: ignore
+    ddf: dd.DataFrame,
+    *,
+    bucket_limits: list[np.timedelta64],  # type: ignore
+) -> dd.DataFrame:  # type: ignore
     bucket_sizes = [
         float(
             ddf.map_partitions(
@@ -137,7 +137,7 @@ def _preprocess_dataset(
         tmpdir_path = Path(tmpdir)
 
         # convert datetime
-        raw_ddf["OccurredTime"] = dd.to_datetime(raw_ddf["OccurredTime"]) # type: ignore
+        raw_ddf["OccurredTime"] = dd.to_datetime(raw_ddf["OccurredTime"])  # type: ignore
         raw_with_datetime_ddf = write_and_read_parquet(
             raw_ddf, path=tmpdir_path / "raw_with_datetime.parquet"
         )
@@ -304,11 +304,11 @@ def _preprocess_dataset(
                 else:
                     (processed_data_path / ds_name).unlink()
             shutil.copytree(tmpdir_path / ds_name, processed_data_path / ds_name)
-            ddf = dd.read_parquet(processed_data_path / ds_name) # type: ignore
-            retval = (*retval, ddf) # type: ignore
+            ddf = dd.read_parquet(processed_data_path / ds_name)  # type: ignore
+            retval = (*retval, ddf)  # type: ignore
         logger.info(f" - files copied to {processed_data_path}...")
 
-    return *retval, bucket_sizes, t_max # type: ignore
+    return *retval, bucket_sizes, t_max  # type: ignore
 
 
 def preprocess_dataset(raw_data_path: Path, processed_data_path: Path) -> None:

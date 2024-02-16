@@ -100,7 +100,7 @@ def calculate_occured_timedelta(
     )
 
     df.loc[
-        df["OccurredTime"] > t_max - churn_time, "OccurredTimeDelta" # type: ignore
+        df["OccurredTime"] > t_max - churn_time, "OccurredTimeDelta"  # type: ignore
     ] = np.timedelta64("NaT")
 
     if (df["OccurredTimeDelta"] > churn_time).any():
@@ -123,7 +123,9 @@ def calculate_choice_probabilities(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_chosen_indexes(df: pd.DataFrame, *, num_choices: int) -> np.ndarray[Any, dtype[signedinteger[Any]]]:
+def get_chosen_indexes(
+    df: pd.DataFrame, *, num_choices: int
+) -> np.ndarray[Any, dtype[signedinteger[Any]]]:
     return np.random.choice(
         len(df["Probability"]),
         size=num_choices,
@@ -132,7 +134,9 @@ def get_chosen_indexes(df: pd.DataFrame, *, num_choices: int) -> np.ndarray[Any,
     )
 
 
-def get_histories_mask(df: pd.DataFrame, ix: np.ndarray[Any, dtype[signedinteger[Any]]], history_size: int) -> pd.DataFrame:
+def get_histories_mask(
+    df: pd.DataFrame, ix: np.ndarray[Any, dtype[signedinteger[Any]]], history_size: int
+) -> pd.DataFrame:
     ih = np.arange(history_size) - history_size + 1
     ixx = (ix.reshape(-1, 1) + ih.reshape(1, -1)).reshape(-1)
     mask = np.zeros_like(ixx, dtype=bool)
@@ -191,13 +195,13 @@ def sample_dataframe_by_time(
 
 
 def sample_dataframe_by_time_ddf(
-    ddf: dd.DataFrame, # type: ignore
+    ddf: dd.DataFrame,  # type: ignore
     *,
     history_size: int,
     t_max: datetime,
     churn_time: timedelta = timedelta(days=28),
     construct_histories: bool,
-) -> dd.DataFrame: # type: ignore
+) -> dd.DataFrame:  # type: ignore
     meta_sample = ddf.head(history_size * 10)
     meta = sample_dataframe_by_time(
         meta_sample,
@@ -218,7 +222,9 @@ def sample_dataframe_by_time_ddf(
     )
 
 
-def get_last_valid_person_indexes(df: pd.DataFrame) -> np.ndarray[Any, dtype[signedinteger[Any]]]:
+def get_last_valid_person_indexes(
+    df: pd.DataFrame,
+) -> np.ndarray[Any, dtype[signedinteger[Any]]]:
     valid_events = df["Probability"] != 0.0
 
     user_ids = df["PersonId"].values
@@ -247,13 +253,13 @@ def sample_dataframe_by_user_id(
 
 
 def sample_dataframe_by_user_id_ddf(
-    ddf: dd.DataFrame, # type: ignore
+    ddf: dd.DataFrame,  # type: ignore
     *,
     history_size: int,
     t_max: datetime,
     churn_time: timedelta = timedelta(days=28),
     construct_histories: bool,
-) -> dd.DataFrame: # type: ignore
+) -> dd.DataFrame:  # type: ignore
     meta_sample = ddf.head(history_size * 10)
     meta = sample_dataframe_by_user_id(
         meta_sample,
@@ -308,7 +314,7 @@ def _preprocess_dataset(
         tmpdir_path = Path(tmpdir)
 
         # convert datetime
-        raw_ddf["OccurredTime"] = dd.to_datetime(raw_ddf["OccurredTime"]) # type: ignore
+        raw_ddf["OccurredTime"] = dd.to_datetime(raw_ddf["OccurredTime"])  # type: ignore
         raw_with_datetime_ddf = write_and_read_parquet(
             raw_ddf, path=tmpdir_path / "raw_with_datetime.parquet"
         )
@@ -396,11 +402,11 @@ def _preprocess_dataset(
                 else:
                     (processed_data_path / ds_name).unlink()
             shutil.copytree(tmpdir_path / ds_name, processed_data_path / ds_name)
-            ddf = dd.read_parquet(processed_data_path / ds_name) # type: ignore
-            retval = (*retval, ddf) # type: ignore
+            ddf = dd.read_parquet(processed_data_path / ds_name)  # type: ignore
+            retval = (*retval, ddf)  # type: ignore
         logger.info(f" - files copied to {processed_data_path}...")
 
-    return *retval, t_max # type: ignore
+    return *retval, t_max  # type: ignore
 
 
 def calculate_vocab(

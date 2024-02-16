@@ -1,16 +1,5 @@
-import json
-from datetime import datetime, timedelta
-from pathlib import Path
-
 import matplotlib.pyplot as plt
 import pandas as pd
-import torch
-import tqdm
-from torch.utils.data import DataLoader
-
-from infobip_service.dataset.load_dataset import UserHistoryDataset
-from infobip_service.dataset.preprocessing import processed_data_path
-from infobip_service.model import ChurnModel, ChurnProbabilityModel  # type: ignore
 
 
 def graph_hit_rate(
