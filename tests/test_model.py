@@ -11,6 +11,7 @@ from infobip_service.dataset.load_dataset import UserHistoryDataset
 from infobip_service.dataset.preprocessing import processed_data_path
 from infobip_service.model import ChurnModel, ChurnProbabilityModel
 from infobip_service.model.churn_model import (
+    cdf_after_x_seconds,
     churn,
     interpolate_cdf_from_pdf,
 )
@@ -54,6 +55,20 @@ def test_interpolate_cdf_from_pdf():
     for i in np.linspace(1, 28, 100):
         assert 0 <= cdf(i) <= 1
         assert cdf(i - 1) <= cdf(i)
+
+
+def test_cdf_after_x_seconds():
+    pdf = [0.1, 0.2, 0.3, 0.4]
+    cdf = interpolate_cdf_from_pdf(pdf, [0, 1, 5, 28])
+
+    for i in np.linspace(1, 28, 100):
+        assert cdf_after_x_seconds(
+            cdf,
+            seconds=i - 1,
+        )(i + 1) >= cdf_after_x_seconds(
+            cdf,
+            seconds=i,
+        )(i + 1)
 
 
 def test_churn():
