@@ -104,7 +104,7 @@ def sample_dataframe_buckets(
 
 
 def calculate_bucket_sizes(
-    ddf: dd.DataFrame,
+    ddf: dd.DataFrame,  # type: ignore
     *,
     bucket_limits: list[np.timedelta64],  # type: ignore
 ) -> dd.DataFrame:  # type: ignore
