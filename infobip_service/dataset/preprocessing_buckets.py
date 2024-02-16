@@ -3,11 +3,13 @@ import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 
 import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 from dask.distributed import Client, LocalCluster
+from numpy import dtype, signedinteger
 
 from infobip_service.dataset.preprocessing import (
     calculate_time_mean_std,
@@ -33,7 +35,7 @@ bucket_limits = (
 def calculate_occured_timedelta(
     df: pd.DataFrame,
     t_max: datetime,
-    churn_time: np.datetime64 = np.timedelta64(28, "D"), # noqa
+    churn_time: np.timedelta64 = np.timedelta64(28, "D"),  # noqa
 ) -> pd.DataFrame:
     xs = df["OccurredTime"].values
     x_max = np.max(xs)
@@ -54,7 +56,7 @@ def calculate_occured_timedelta(
     )
 
     df.loc[
-        df["OccurredTime"] > t_max - churn_time, "OccurredTimeDelta"
+        df["OccurredTime"] > t_max - churn_time, "OccurredTimeDelta" # type: ignore
     ] = np.timedelta64("NaT")
 
     if (df["OccurredTimeDelta"] > churn_time).any():
@@ -67,8 +69,8 @@ def get_bucket_rows(
     df: pd.DataFrame,
     *,
     floor: np.timedelta64,
-    ceil: np.timedelta64 = np.timedelta64("NaT"), # noqa
-) -> np.ndarray:
+    ceil: np.timedelta64 = np.timedelta64("NaT"),  # noqa
+) -> pd.DataFrame:
     if np.isnat(ceil):
         return df[df["OccurredTimeDelta"] >= floor]
     return df[(df["OccurredTimeDelta"] >= floor) & (df["OccurredTimeDelta"] < ceil)]
@@ -93,7 +95,7 @@ def sample_dataframe_buckets_last_event(
 
 
 def sample_dataframe_buckets(
-    df: pd.DataFrame, *, bucket_limits: list[np.timedelta64], history_size
+    df: pd.DataFrame, *, bucket_limits: list[np.timedelta64], history_size: int
 ) -> pd.DataFrame:
     sampled_last_events = sample_dataframe_buckets_last_event(
         df, bucket_limits=bucket_limits, sample_coefficient=1 / history_size
@@ -104,8 +106,8 @@ def sample_dataframe_buckets(
 
 
 def calculate_bucket_sizes(
-    ddf: dd.DataFrame, *, bucket_limits=list[np.timedelta64]
-) -> dd.DataFrame:
+    ddf: dd.DataFrame, *, bucket_limits: List[np.timedelta64] # type: ignore
+) -> dd.DataFrame: # type: ignore
     bucket_sizes = [
         float(
             ddf.map_partitions(
@@ -128,14 +130,14 @@ def _preprocess_dataset(
     history_size: int = 32,
     drop_data_before: datetime | None = None,
     bucket_limits: list[np.timedelta64] = bucket_limits,
-) -> tuple[dd.DataFrame, dd.DataFrame, dd.DataFrame, datetime]:  # type: ignore
+) -> tuple[dd.DataFrame, dd.DataFrame, dd.DataFrame, np.ndarray, datetime]:  # type: ignore
     raw_ddf = dd.read_parquet(raw_data_path, calculate_divisions=True)  # type: ignore
 
     with TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
 
         # convert datetime
-        raw_ddf["OccurredTime"] = dd.to_datetime(raw_ddf["OccurredTime"])
+        raw_ddf["OccurredTime"] = dd.to_datetime(raw_ddf["OccurredTime"]) # type: ignore
         raw_with_datetime_ddf = write_and_read_parquet(
             raw_ddf, path=tmpdir_path / "raw_with_datetime.parquet"
         )
@@ -302,11 +304,11 @@ def _preprocess_dataset(
                 else:
                     (processed_data_path / ds_name).unlink()
             shutil.copytree(tmpdir_path / ds_name, processed_data_path / ds_name)
-            ddf = dd.read_parquet(processed_data_path / ds_name)
-            retval = (*retval, ddf)
+            ddf = dd.read_parquet(processed_data_path / ds_name) # type: ignore
+            retval = (*retval, ddf) # type: ignore
         logger.info(f" - files copied to {processed_data_path}...")
 
-    return *retval, bucket_sizes, t_max
+    return *retval, bucket_sizes, t_max # type: ignore
 
 
 def preprocess_dataset(raw_data_path: Path, processed_data_path: Path) -> None:

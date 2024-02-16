@@ -9,6 +9,7 @@ import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 from dask.distributed import Client, LocalCluster
+from numpy import dtype, signedinteger
 
 from infobip_service.dataset.download import raw_data_path
 from infobip_service.logger import get_logger, supress_timestamps
@@ -61,7 +62,7 @@ def remove_without_history(
     ddf: dd.DataFrame,  # type: ignore
     *,
     from_time: datetime,
-    to_time: timedelta | None = None,
+    to_time: datetime,
 ) -> dd.DataFrame:  # type: ignore
     meta = _remove_without_history(ddf._meta, from_time=from_time, to_time=to_time)
     return ddf.map_partitions(
@@ -78,7 +79,7 @@ def remove_without_history(
 def calculate_occured_timedelta(
     df: pd.DataFrame,
     t_max: datetime,
-    churn_time: np.datetime64 = np.timedelta64(28, "D"), # noqa
+    churn_time: np.timedelta64 = np.timedelta64(28, "D"),  # noqa
 ) -> pd.DataFrame:
     xs = df["OccurredTime"].values
     x_max = np.max(xs)
@@ -99,7 +100,7 @@ def calculate_occured_timedelta(
     )
 
     df.loc[
-        df["OccurredTime"] > t_max - churn_time, "OccurredTimeDelta"
+        df["OccurredTime"] > t_max - churn_time, "OccurredTimeDelta" # type: ignore
     ] = np.timedelta64("NaT")
 
     if (df["OccurredTimeDelta"] > churn_time).any():
@@ -122,7 +123,7 @@ def calculate_choice_probabilities(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_chosen_indexes(df: pd.DataFrame, *, num_choices: int) -> int:
+def get_chosen_indexes(df: pd.DataFrame, *, num_choices: int) -> np.ndarray[Any, dtype[signedinteger[Any]]]:
     return np.random.choice(
         len(df["Probability"]),
         size=num_choices,
@@ -131,7 +132,7 @@ def get_chosen_indexes(df: pd.DataFrame, *, num_choices: int) -> int:
     )
 
 
-def get_histories_mask(df, ix, history_size):
+def get_histories_mask(df: pd.DataFrame, ix: np.ndarray[Any, dtype[signedinteger[Any]]], history_size: int) -> pd.DataFrame:
     ih = np.arange(history_size) - history_size + 1
     ixx = (ix.reshape(-1, 1) + ih.reshape(1, -1)).reshape(-1)
     mask = np.zeros_like(ixx, dtype=bool)
@@ -190,13 +191,13 @@ def sample_dataframe_by_time(
 
 
 def sample_dataframe_by_time_ddf(
-    ddf: dd.DataFrame,
+    ddf: dd.DataFrame, # type: ignore
     *,
     history_size: int,
     t_max: datetime,
     churn_time: timedelta = timedelta(days=28),
     construct_histories: bool,
-) -> dd.DataFrame:
+) -> dd.DataFrame: # type: ignore
     meta_sample = ddf.head(history_size * 10)
     meta = sample_dataframe_by_time(
         meta_sample,
@@ -217,7 +218,7 @@ def sample_dataframe_by_time_ddf(
     )
 
 
-def get_last_valid_person_indexes(df: pd.DataFrame) -> np.ndarray:
+def get_last_valid_person_indexes(df: pd.DataFrame) -> np.ndarray[Any, dtype[signedinteger[Any]]]:
     valid_events = df["Probability"] != 0.0
 
     user_ids = df["PersonId"].values
@@ -246,13 +247,13 @@ def sample_dataframe_by_user_id(
 
 
 def sample_dataframe_by_user_id_ddf(
-    ddf: dd.DataFrame,
+    ddf: dd.DataFrame, # type: ignore
     *,
     history_size: int,
     t_max: datetime,
     churn_time: timedelta = timedelta(days=28),
     construct_histories: bool,
-) -> dd.DataFrame:
+) -> dd.DataFrame: # type: ignore
     meta_sample = ddf.head(history_size * 10)
     meta = sample_dataframe_by_user_id(
         meta_sample,
@@ -307,7 +308,7 @@ def _preprocess_dataset(
         tmpdir_path = Path(tmpdir)
 
         # convert datetime
-        raw_ddf["OccurredTime"] = dd.to_datetime(raw_ddf["OccurredTime"])
+        raw_ddf["OccurredTime"] = dd.to_datetime(raw_ddf["OccurredTime"]) # type: ignore
         raw_with_datetime_ddf = write_and_read_parquet(
             raw_ddf, path=tmpdir_path / "raw_with_datetime.parquet"
         )
@@ -395,11 +396,11 @@ def _preprocess_dataset(
                 else:
                     (processed_data_path / ds_name).unlink()
             shutil.copytree(tmpdir_path / ds_name, processed_data_path / ds_name)
-            ddf = dd.read_parquet(processed_data_path / ds_name)
-            retval = (*retval, ddf)
+            ddf = dd.read_parquet(processed_data_path / ds_name) # type: ignore
+            retval = (*retval, ddf) # type: ignore
         logger.info(f" - files copied to {processed_data_path}...")
 
-    return *retval, t_max
+    return *retval, t_max # type: ignore
 
 
 def calculate_vocab(
@@ -448,6 +449,7 @@ def preprocess_dataset(raw_data_path: Path, processed_data_path: Path) -> None:
         train_ddf, *_ = _preprocess_dataset(
             raw_data_path=raw_data_path,
             processed_data_path=processed_data_path,
+            construct_histories=True,
         )
 
         logger.info("Calculating vocab...")
