@@ -37,7 +37,7 @@ def get_dataloaders(
 
 def train_epoch(
     model: torch.nn.Module,
-    dataloader: DataLoader, # type: ignore
+    dataloader: DataLoader,  # type: ignore
     optimizer: torch.optim.Optimizer,
     loss_fn: torch.nn.CrossEntropyLoss,
     device: str,
@@ -75,9 +75,9 @@ def evaluate_loss(
 
 def train_model(
     model: torch.nn.Module,
-    dataloaders: dict[str, DataLoader], # type: ignore
+    dataloaders: dict[str, DataLoader],  # type: ignore
     optimizer: torch.optim.Optimizer,
-    loss_fn: torch.nn.CrossEntropyLoss, # type: ignore
+    loss_fn: torch.nn.CrossEntropyLoss,  # type: ignore
     device: str,
     num_epochs: int = 10,
 ) -> torch.nn.Module:
