@@ -135,10 +135,10 @@ jobs:
           remove-codeql: 'true'
           remove-docker-images: 'true'
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Log in to the Container registry
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -189,7 +189,7 @@ jobs:
       STAGING_GPU_DEVICE: ${{ vars.STAGING_GPU_DEVICE }}
       DOMAIN: ${{ vars.DOMAIN }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       # This is to fix GIT not liking owner of the checkout dir - https://github.com/actions/runner/issues/2033#issuecomment-1204205989
       - run: chown -R $(id -u):$(id -g) $PWD
       - run: if [[ $GITHUB_REF_NAME == "main" ]]; then echo "TAG=latest" >> $GITHUB_ENV ; else echo "TAG=dev" >> $GITHUB_ENV ; fi;
