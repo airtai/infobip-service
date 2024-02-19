@@ -5,6 +5,7 @@ import dask.dataframe as df
 import pandas as pd
 
 from infobip_service.model import ChurnProbabilityModel  # type: ignore
+from infobip_service.dataset.preprocessing_buckets import preprocess_dataset  # type: ignore
 
 
 class TimeSeriesDownstreamSolution:
@@ -24,12 +25,11 @@ class TimeSeriesDownstreamSolution:
         self.processed_data_path = processed_data_path
         self.model = None
 
-    def train(self, skip_preprocess: bool = False) -> "TimeSeriesDownstreamSolution":
-        # if not skip_preprocess:
-        #     preprocess_dataset(self.raw_data_path, self.processed_data_path)
-        # self.model = train_model(  # type: ignore
-        #     self.processed_data_path, self.epochs, self.learning_rate
-        # ).cpu()
+    def train(self) -> "TimeSeriesDownstreamSolution":
+        preprocess_dataset(self.raw_data_path, self.processed_data_path)
+        self.model = train_model(  # type: ignore
+            self.processed_data_path, self.epochs, self.learning_rate
+        ).cpu()
         return self
 
     def predict(
