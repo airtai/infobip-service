@@ -4,8 +4,10 @@ from pathlib import Path
 import dask.dataframe as df
 import pandas as pd
 
+from infobip_service.dataset.preprocessing_buckets import (
+    preprocess_dataset,  # type: ignore
+)
 from infobip_service.model import ChurnProbabilityModel  # type: ignore
-from infobip_service.dataset.preprocessing_buckets import preprocess_dataset  # type: ignore
 
 
 class TimeSeriesDownstreamSolution:
