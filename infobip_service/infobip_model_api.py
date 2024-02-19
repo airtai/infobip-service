@@ -21,8 +21,10 @@ class TimeSeriesDownstreamSolution:
         self.processed_data_path = processed_data_path
         self.model = None
 
-    def train(self) -> "TimeSeriesDownstreamSolution":
+    def train(self, skip_preprocess: bool = False) -> "TimeSeriesDownstreamSolution":
         # TODO: Implement preprocessing and training
+        if not skip_preprocess:
+            pass
         return self
 
     def predict(
