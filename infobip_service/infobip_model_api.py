@@ -29,9 +29,9 @@ class TimeSeriesDownstreamSolution:
 
     def train(self) -> "TimeSeriesDownstreamSolution":
         preprocess_dataset(self.raw_data_path, self.processed_data_path)
-        self.model = train_model(  # type: ignore
-            self.processed_data_path, self.epochs, self.learning_rate
-        ).cpu()
+        # self.model = train_model(  # type: ignore
+        #     self.processed_data_path, self.epochs, self.learning_rate
+        # ).cpu()
         return self
 
     def predict(
