@@ -60,14 +60,14 @@ devdocs = [
     "mdx-include==1.4.2",
     "mkdocstrings[python]==0.24.0",
     "mkdocs-literate-nav==0.6.1",
-    "mkdocs-git-revision-date-localized-plugin==1.2.2",
+    "mkdocs-git-revision-date-localized-plugin==1.2.4",
     "mike==2.0.0",  # versioning
     "mkdocs-minify-plugin==0.7.2",
     "mkdocs-macros-plugin==1.0.5",  # includes with variables
     "mkdocs-glightbox==0.3.6",  # img zoom
     "pillow==10.2.0",
     "cairosvg==2.7.1",
-    "black==23.12.1",
+    "black==24.2.0",
     "requests",  # do not pin it
 ]
 
@@ -80,7 +80,7 @@ lint = [
     "types-docutils",
     "mypy==1.8.0",
     "ruff==0.2.2",
-    "bandit==1.7.6",
+    "bandit==1.7.7",
     "semgrep==1.60.1",
 ]
 
