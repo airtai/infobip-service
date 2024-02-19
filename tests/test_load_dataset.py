@@ -1,119 +1,102 @@
-import json
-from datetime import datetime, timedelta
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
+import numpy as np
 import pandas as pd
-import pytest
 
-from infobip_service.load_dataset import (
-    UserHistoryDataset,
-    _bin_timedelta,
-    bin_next_event_user_history,
-)
-from infobip_service.preprocessing import processed_data_path
-
-user_history = pd.DataFrame(
-    {
-        "AccountId": [12345, 12345, 12345],
-        "OccurredTime": [
-            "2023-07-10 13:27:00.123456",
-            "2023-07-12 13:27:01.246912",
-            "2023-07-28 13:27:05.740736",
-        ],
-        "DefinitionId": ["one", "one", "one"],
-        "ApplicationId": [None, None, None],
-    },
-    index=pd.Index([1, 1, 1], name="PersonId"),
-)
-user_history["OccurredTime"] = pd.to_datetime(user_history["OccurredTime"])
+from infobip_service.dataset.load_dataset import UserHistoryDataset, prepare_sample
 
 
-def test_bin_timedelta():
-    assert _bin_timedelta(timedelta(days=0)) == 0
-    assert _bin_timedelta(timedelta(days=2)) == 1
-    assert _bin_timedelta(timedelta(days=4)) == 2
-    assert _bin_timedelta(timedelta(days=8)) == 3
-    assert _bin_timedelta(timedelta(days=16)) == 4
-    assert _bin_timedelta(timedelta(days=32)) == 5
+def test_prepare_sample():
+    test_df = pd.DataFrame(
+        {
+            "DefinitionId": ["A", "B", "C", "D", "E", "A", "B", "C", "D", "E"],
+            "OccurredTime": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            "HasHistory": [False, True, True, True, True, True, True, True, True, True],
+        }
+    )
+
+    time_mean = 1.0
+    definition_id_vocabulary = ["A", "B", "C", "D", "E"]
+
+    prepared_sample = prepare_sample(
+        test_df, definition_id_vocabulary=definition_id_vocabulary, time_mean=time_mean
+    )
+
+    expected = np.array(
+        [
+            [5, 1],
+            [1, 1],
+            [2, 2],
+            [3, 3],
+            [4, 4],
+            [0, 5],
+            [1, 6],
+            [2, 7],
+            [3, 8],
+            [4, 9],
+        ]
+    )
+
+    assert np.array_equal(prepared_sample, expected)
 
 
-def test_bin_next_event_user_history():
-    assert (
-        bin_next_event_user_history(
-            datetime(2023, 7, 10, 23, 59), t0=datetime(2023, 7, 10)
+def test_user_history_dataset():
+    test_df = pd.DataFrame(
+        {
+            "DefinitionId": ["A", "B", "C", "D", "E", "A"],
+            "OccurredTime": [
+                np.datetime64("2024-01-01"),
+                np.datetime64("2024-01-02"),
+                np.datetime64("2024-01-03"),
+                np.datetime64("2024-01-04"),
+                np.datetime64("2024-01-05"),
+                np.datetime64("2024-01-06"),
+            ],
+            "OccurredTimeDelta": [np.timedelta64(i, "D") for i in range(6)],
+            "HasHistory": [False, True, True, False, False, True],
+        }
+    )
+
+    time_mean = 1.0
+    definition_id_vocabulary = ["A", "B", "C", "D", "E"]
+
+    bins = [
+        np.timedelta64(days, "D").astype("timedelta64[s]").astype(int)
+        for days in range(0, 29, 1)
+    ]
+
+    with TemporaryDirectory() as temp_dir:
+        test_df.to_parquet(Path(temp_dir) / "test.parquet")
+        dataset = UserHistoryDataset(
+            Path(temp_dir) / "test.parquet",
+            definition_id_vocabulary=definition_id_vocabulary,
+            time_mean=time_mean,
+            bins=bins,
+            history_size=3,
         )
-        == 0
-    )  # 1 day to first event
-    assert (
-        bin_next_event_user_history(datetime(2023, 7, 11), t0=datetime(2023, 7, 10))
-        == 1
-    )  # 1.0000001 day to first event
-    assert (
-        bin_next_event_user_history(datetime(2023, 7, 13), t0=datetime(2023, 7, 10))
-        == 2
-    )  # 3 days to first event
-    assert (
-        bin_next_event_user_history(datetime(2023, 7, 17), t0=datetime(2023, 7, 10))
-        == 3
-    )  # 7 days to first event
-    assert (
-        bin_next_event_user_history(datetime(2023, 7, 25), t0=datetime(2023, 7, 10))
-        == 4
-    )  # 14 days to first event
-    assert (
-        bin_next_event_user_history(datetime(2023, 8, 7), t0=datetime(2023, 7, 10)) == 5
-    )  # 28 days to first event
-    assert (
-        bin_next_event_user_history(datetime(2023, 8, 11), t0=datetime(2023, 7, 10))
-        == 5
-    )  # 32 days to first event
-    assert (
-        bin_next_event_user_history(None, t0=datetime(2023, 7, 10)) == 5
-    )  # No next event
 
-
-@pytest.mark.skip(reason="Dataset not available on CI/CD")
-def test_train_dataset():
-    with open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
-        vocab = json.load(f)
-
-    train_dataset = UserHistoryDataset(
-        processed_data_path / "train_prepared.parquet", definitionId_vocab=vocab
+    expected_x = np.array(
+        [
+            [5.0, 1.0],
+            [
+                1.0,
+                np.datetime64("2024-01-02")
+                .astype("datetime64[s]")
+                .astype(int)
+                .astype(float),
+            ],
+            [
+                2.0,
+                np.datetime64("2024-01-03")
+                .astype("datetime64[s]")
+                .astype(int)
+                .astype(float),
+            ],
+        ]
     )
 
-    for i in range(100):
-        x, y = train_dataset[i]
-        assert x.shape == (64, 2)
-        assert y >= 0
-        assert y <= 5
+    expected_y = 2
 
-
-@pytest.mark.skip(reason="Dataset not available on CI/CD")
-def test_test_dataset():
-    with open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
-        vocab = json.load(f)
-
-    test_dataset = UserHistoryDataset(
-        processed_data_path / "test_prepared.parquet", definitionId_vocab=vocab
-    )
-
-    for i in range(100):
-        x, y = test_dataset[i]
-        assert x.shape == (64, 2)
-        assert y >= 0
-        assert y <= 5
-
-
-@pytest.mark.skip(reason="Dataset not available on CI/CD")
-def test_val_dataset():
-    with open(processed_data_path / "DefinitionId_vocab.json", "rb") as f:
-        vocab = json.load(f)
-
-    val_dataset = UserHistoryDataset(
-        processed_data_path / "validation_prepared.parquet", definitionId_vocab=vocab
-    )
-
-    for i in range(100):
-        x, y = val_dataset[i]
-        assert x.shape == (64, 2)
-        assert y >= 0
-        assert y <= 5
+    assert np.array_equal(dataset[0][0], expected_x)
+    assert dataset[0][1] == expected_y

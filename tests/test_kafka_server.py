@@ -209,12 +209,12 @@ def test_model_metrics():
         task_type="churn",
         auc=0.95,
         recall=0.94,
-        precission=0.98,
+        precision=0.98,
         accuracy=0.99,
         f1=2 * 0.94 * 0.98 / (0.94 + 0.98),
     )
 
-    expected = '{"AccountId": 12345, "ApplicationId": null, "ModelId": "456", "timestamp": "2021-03-28T00:34:08", "task_type": "churn", "auc": 0.95, "f1": 0.9595833333333332, "precission": 0.98, "recall": 0.94, "accuracy": 0.99}'
+    expected = '{"AccountId": 12345, "ApplicationId": null, "ModelId": "456", "timestamp": "2021-03-28T00:34:08", "task_type": "churn", "auc": 0.95, "f1": 0.9595833333333332, "precision": 0.98, "recall": 0.94, "accuracy": 0.99}'
     actual = model_metrics.json()
 
     assert actual == expected, actual
@@ -226,7 +226,7 @@ def test_model_metrics():
         task_type="churn",
         auc=0.95,
         recall=0.94,
-        precission=0.98,
+        precision=0.98,
         accuracy=0.99,
         f1=2 * 0.94 * 0.98 / (0.94 + 0.98),
     )

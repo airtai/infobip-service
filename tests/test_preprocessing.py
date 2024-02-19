@@ -1,337 +1,544 @@
-import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import dask.dataframe as dd
+import numpy as np
 import pandas as pd
-import pytest
 
-from infobip_service.preprocessing import (
-    _get_next_event,
+from infobip_service.dataset.preprocessing import (
     _remove_without_history,
-    _sample_time_map,
-    convert_datetime,
-    create_user_histories,
-    get_next_event,
-    prepare_data,
-    random_date,
-    remove_without_history,
-    sample_time_map,
-    sample_user_histories,
+    calculate_choice_probabilities,
+    calculate_occured_timedelta,
+    get_chosen_indexes,
+    get_histories_mask,
+    get_last_valid_person_indexes,
     split_data,
-    write_and_read_parquet,
-)
-
-user_histories_df = pd.DataFrame(
-    {
-        "AccountId": [12345, 12345, 12345, 12345, 12345],
-        "OccurredTime": [
-            "2023-07-10 13:27:00.123456",
-            "2023-07-12 13:27:01.246912",
-            "2023-07-28 13:27:05.740736",
-            "2023-07-13 13:27:01.246912",
-            "2023-07-26 13:27:05.740736",
-        ],
-        "DefinitionId": ["one", "one", "one", "two", "two"],
-        "ApplicationId": [None, None, None, None, None],
-    },
-    index=pd.Index([1, 1, 2, 2, 2], name="PersonId"),
 )
 
 
-user_histories_df["OccurredTime"] = pd.to_datetime(user_histories_df["OccurredTime"])
-user_histories_df["DefinitionId"] = user_histories_df["DefinitionId"].astype(
-    "string[pyarrow]"
-)
-user_histories_df["ApplicationId"] = user_histories_df["ApplicationId"].astype(
-    "string[pyarrow]"
-)
-
-user_histories_ddf = dd.from_pandas(user_histories_df, npartitions=2)
-
-user_history_df = pd.DataFrame(
-    {
-        "AccountId": [12345],
-        "OccurredTime": [
-            "2023-07-28 13:27:05.740736",
-        ],
-        "DefinitionId": ["one"],
-        "ApplicationId": [None],
-    },
-    index=pd.Index([1], name="PersonId"),
-)
-
-user_history_df["OccurredTime"] = pd.to_datetime(user_history_df["OccurredTime"])
-user_history_df["DefinitionId"] = user_history_df["DefinitionId"].astype(
-    "string[pyarrow]"
-)
-user_history_df["ApplicationId"] = user_history_df["ApplicationId"].astype(
-    "string[pyarrow]"
-)
-
-user_history_ddf = dd.from_pandas(user_history_df, npartitions=1)
-
-
-def test_sample_time_map_df():
-    expected = pd.DataFrame(
+def test_dataset_split():
+    test_df = pd.DataFrame(
         {
-            "AccountId": [12345, 12345, 12345],
+            "user_id": np.random.randint(0, 100, 100),
+            "feature1": np.random.rand(100),
+            "feature2": np.random.rand(100),
+            "label": np.random.randint(0, 2, 100),
+        }
+    )
+    test_df = test_df.set_index("user_id")
+
+    test_ddf = dd.from_pandas(test_df, npartitions=2)
+
+    train_data, validation_data = split_data(test_ddf, split_ratio=0.8)
+
+    train_len = train_data.shape[0].compute()
+    validation_len = validation_data.shape[0].compute()
+    test_len = test_df.shape[0]
+
+    assert train_len + validation_len == test_len
+
+    train_index = train_data.index.unique().compute()
+    validation_index = validation_data.index.unique().compute()
+    test_index = test_df.index.unique()
+
+    assert len(np.intersect1d(train_index, validation_index)) == 0
+
+    train_validation_index = np.concatenate([train_index, validation_index])
+
+    assert len(np.intersect1d(train_validation_index, test_index)) == len(test_index)
+
+
+def test_remove_without_history_1():
+    test_df = pd.DataFrame(
+        {
+            "user_id": [1, 1, 1, 2, 2, 2, 3, 3, 3],
             "OccurredTime": [
-                "2023-07-10 13:27:00.123456",
-                "2023-07-12 13:27:01.246912",
-                "2023-07-13 13:27:01.246912",
+                datetime(2024, 1, 1),
+                datetime(2024, 1, 2),
+                datetime(2024, 1, 3),
+                datetime(2023, 1, 1),
+                datetime(2024, 1, 2),
+                datetime(2024, 1, 7),
+                datetime(2023, 1, 1),
+                datetime(2023, 12, 1),
+                datetime(2023, 12, 4),
             ],
-            "DefinitionId": ["one", "one", "two"],
-            "ApplicationId": [None, None, None],
-        },
-        index=pd.Index([1, 1, 2], name="PersonId"),
+        }
     )
 
-    expected["OccurredTime"] = pd.to_datetime(expected["OccurredTime"])
-    expected["DefinitionId"] = expected["DefinitionId"].astype("string[pyarrow]")
-    expected["ApplicationId"] = expected["ApplicationId"].astype("string[pyarrow]")
+    test_df = test_df.set_index("user_id")
 
-    pd.testing.assert_frame_equal(
-        _sample_time_map(user_histories_df, time_treshold=datetime(2023, 7, 14)),
-        expected,
-    )
+    from_time = datetime(2024, 1, 1)
+    to_time = datetime(2024, 1, 4)
+
+    result = _remove_without_history(test_df, from_time=from_time, to_time=to_time)
+
+    assert result.shape[0] == 6
+
+    assert result.index.unique().values.tolist() == [1, 2]
 
 
-def test_sample_time_map_ddf():
-    expected = pd.DataFrame(
+def test_remove_without_history_2():
+    test_df = pd.DataFrame(
         {
-            "AccountId": [12345, 12345, 12345],
+            "user_id": [1, 1, 1, 2, 2, 2, 3, 3, 3],
             "OccurredTime": [
-                "2023-07-10 13:27:00.123456",
-                "2023-07-12 13:27:01.246912",
-                "2023-07-13 13:27:01.246912",
+                datetime(2024, 1, 1),
+                datetime(2024, 1, 2),
+                datetime(2024, 1, 3),
+                datetime(2023, 1, 1),
+                datetime(2024, 1, 2),
+                datetime(2024, 1, 7),
+                datetime(2023, 1, 1),
+                datetime(2023, 12, 1),
+                datetime(2023, 12, 4),
             ],
-            "DefinitionId": ["one", "one", "two"],
-            "ApplicationId": [None, None, None],
-        },
-        index=pd.Index([1, 1, 2], name="PersonId"),
+        }
     )
 
-    expected["OccurredTime"] = pd.to_datetime(expected["OccurredTime"])
-    expected["DefinitionId"] = expected["DefinitionId"].astype("string[pyarrow]")
-    expected["ApplicationId"] = expected["ApplicationId"].astype("string[pyarrow]")
+    test_df = test_df.set_index("user_id")
 
-    pd.testing.assert_frame_equal(
-        sample_time_map(
-            user_histories_ddf, time_treshold=datetime(2023, 7, 14)
-        ).compute(),
-        expected,
-    )
+    from_time = datetime(2023, 11, 30)
+    to_time = datetime(2023, 12, 10)
+
+    result = _remove_without_history(test_df, from_time=from_time, to_time=to_time)
+
+    assert result.shape[0] == 3
+
+    assert result.index.unique().values.tolist() == [3]
 
 
-def test_remove_without_history_df():
-    result = _remove_without_history(
-        user_histories_df, time_treshold=datetime(2023, 7, 12)
-    )
-
-    expected = pd.DataFrame(
+def test_calculating_timedeltas_1():
+    test_df = pd.DataFrame(
         {
-            "AccountId": [12345, 12345],
+            "PersonId": [
+                1,
+                1,
+                1,
+                2,
+                2,
+                2,
+            ],
             "OccurredTime": [
-                "2023-07-10 13:27:00.123456",
-                "2023-07-12 13:27:01.246912",
+                np.datetime64("2024-01-01"),
+                np.datetime64("2024-01-02"),
+                np.datetime64("2024-01-03"),
+                np.datetime64("2024-01-01"),
+                np.datetime64("2024-01-02"),
+                np.datetime64("2024-01-03"),
             ],
-            "DefinitionId": ["one", "one"],
-            "ApplicationId": [None, None],
-        },
-        index=pd.Index([1, 1], name="PersonId"),
+        }
     )
 
-    expected["OccurredTime"] = pd.to_datetime(expected["OccurredTime"])
-    expected["DefinitionId"] = expected["DefinitionId"].astype("string[pyarrow]")
-    expected["ApplicationId"] = expected["ApplicationId"].astype("string[pyarrow]")
+    test_df = calculate_occured_timedelta(test_df, np.datetime64("2024-02-03"))
+    test_df.head(6)
 
-    pd.testing.assert_frame_equal(result, expected)
+    expected_timedeltas = np.array(
+        [
+            np.timedelta64(1, "D"),
+            np.timedelta64(1, "D"),
+            np.timedelta64(28, "D"),
+            np.timedelta64(1, "D"),
+            np.timedelta64(1, "D"),
+            np.timedelta64(28, "D"),
+        ]
+    )
+
+    np.testing.assert_array_equal(
+        test_df["OccurredTimeDelta"].values, expected_timedeltas
+    )
 
 
-def test_remove_without_history_ddf():
-    result = remove_without_history(
-        user_histories_ddf, time_treshold=datetime(2023, 7, 12)
-    ).compute()
-
-    expected = pd.DataFrame(
+def test_calculating_timedeltas_2():
+    test_df = pd.DataFrame(
         {
-            "AccountId": [12345, 12345],
+            "PersonId": [
+                1,
+                1,
+                1,
+                2,
+                2,
+                2,
+            ],
             "OccurredTime": [
-                "2023-07-10 13:27:00.123456",
-                "2023-07-12 13:27:01.246912",
+                np.datetime64("2024-01-01"),
+                np.datetime64("2024-01-02"),
+                np.datetime64("2024-01-03"),
+                np.datetime64("2024-01-01"),
+                np.datetime64("2024-01-02"),
+                np.datetime64("2024-01-03"),
             ],
-            "DefinitionId": ["one", "one"],
-            "ApplicationId": [None, None],
-        },
-        index=pd.Index([1, 1], name="PersonId"),
+        }
     )
 
-    expected["OccurredTime"] = pd.to_datetime(expected["OccurredTime"])
-    expected["DefinitionId"] = expected["DefinitionId"].astype("string[pyarrow]")
-    expected["ApplicationId"] = expected["ApplicationId"].astype("string[pyarrow]")
+    test_df = calculate_occured_timedelta(
+        test_df, np.datetime64("2024-01-03"), churn_time=np.timedelta64(1, "D")
+    )
 
-    pd.testing.assert_frame_equal(result, expected)
+    expected_timedeltas = np.array(
+        [
+            np.timedelta64(1, "D"),
+            np.timedelta64(1, "D"),
+            np.timedelta64("NaT"),
+            np.timedelta64(1, "D"),
+            np.timedelta64(1, "D"),
+            np.timedelta64("NaT"),
+        ]
+    )
+
+    np.testing.assert_array_equal(
+        test_df["OccurredTimeDelta"].values, expected_timedeltas
+    )
 
 
-def test_split_data():
-    user_histories = pd.DataFrame(
+def test_calculating_time_deltas_3():
+    test_df = pd.DataFrame(
         {
-            "AccountId": [12345, 12345, 12345, 12345, 12345, 12345],
+            "PersonId": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+            ],
             "OccurredTime": [
-                "2023-07-10 13:27:00.123456",
-                "2023-07-12 13:27:01.246912",
-                "2023-07-28 13:27:05.740736",
-                "2023-07-13 13:27:01.246912",
-                "2023-07-26 13:27:05.740736",
-                "2023-07-26 13:27:05.740736",
+                np.datetime64("2024-01-01"),
+                np.datetime64("2024-01-02"),
+                np.datetime64("2024-01-15"),
+                np.datetime64("2024-01-30"),
+                np.datetime64("2024-02-21"),
+                np.datetime64("2024-02-27"),
             ],
-            "DefinitionId": ["one", "one", "one", "two", "two", "three"],
-            "ApplicationId": [None, None, None, None, None, None],
-        },
-        index=pd.Index([1, 1, 2, 2, 3, 3], name="PersonId"),
+        }
     )
 
-    user_histories["OccurredTime"] = pd.to_datetime(user_histories["OccurredTime"])
-    user_histories["AccountId"] = user_histories["AccountId"].astype("string[pyarrow]")
+    test_df = calculate_occured_timedelta(
+        test_df, np.datetime64("2024-02-28"), churn_time=np.timedelta64(28, "D")
+    )
 
-    user_histories_ddf = dd.from_pandas(user_histories, npartitions=5)
+    expected_timedeltas = np.array(
+        [
+            np.timedelta64(1, "D"),
+            np.timedelta64(13, "D"),
+            np.timedelta64(15, "D"),
+            np.timedelta64(22, "D"),
+            np.timedelta64("NaT"),
+            np.timedelta64("NaT"),
+        ]
+    )
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        train, validation = split_data(user_histories_ddf, split_ratio=0.7)
-
-        train = write_and_read_parquet(train, path=tmpdirname + "/train")
-        validation = write_and_read_parquet(validation, path=tmpdirname + "/validation")
-
-        assert train.npartitions == 2
-        assert validation.npartitions == 1
-
-        assert len(train.index.unique().compute()) == 2
-        assert len(validation.index.unique().compute()) == 1
+    np.testing.assert_array_equal(
+        test_df["OccurredTimeDelta"].values, expected_timedeltas
+    )
 
 
-def test_get_next_event_single():
+def test_calculating_timedeltas_4():
+    test_df = pd.DataFrame(
+        {
+            "PersonId": [
+                1,
+                1,
+                1,
+                1,
+            ],
+            "OccurredTime": [
+                np.datetime64("2024-01-01"),
+                np.datetime64("2024-01-02"),
+                np.datetime64("2024-01-15"),
+                np.datetime64("2024-02-25"),
+            ],
+        }
+    )
+
+    test_df = calculate_occured_timedelta(
+        test_df, np.datetime64("2024-04-30"), churn_time=np.timedelta64(28, "D")
+    )
+
+    expected_timedeltas = np.array(
+        [
+            np.timedelta64(1, "D"),
+            np.timedelta64(13, "D"),
+            np.timedelta64(28, "D"),
+            np.timedelta64(28, "D"),
+        ]
+    )
+
+    np.testing.assert_array_equal(
+        test_df["OccurredTimeDelta"].values, expected_timedeltas
+    )
+
+
+def test_calculating_choice_probabilities_1():
+    test_df = pd.DataFrame(
+        {
+            "PersonId": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+            ],
+            "OccurredTimeDelta": [
+                np.timedelta64(1, "D"),
+                np.timedelta64(13, "D"),
+                np.timedelta64(28, "D"),
+                np.timedelta64(28, "D"),
+                np.timedelta64("NaT"),
+                np.timedelta64("NaT"),
+            ],
+        }
+    )
+
+    test_df = calculate_choice_probabilities(test_df)
+
+    expected_probabilities = np.array([1 / 70, 13 / 70, 28 / 70, 28 / 70, 0, 0])
+
+    np.testing.assert_array_almost_equal(
+        test_df["Probability"].values, expected_probabilities
+    )
+    assert np.isclose(test_df["Probability"].sum(), 1)
+
+
+def test_calculating_choice_probabilities_2():
+    test_df = pd.DataFrame(
+        {
+            "PersonId": [
+                1,
+                1,
+                1,
+                2,
+                2,
+                2,
+            ],
+            "OccurredTimeDelta": [
+                np.timedelta64(1, "D"),
+                np.timedelta64(1, "D"),
+                np.timedelta64(28, "D"),
+                np.timedelta64(1, "D"),
+                np.timedelta64(1, "D"),
+                np.timedelta64(28, "D"),
+            ],
+        }
+    )
+
+    test_df = calculate_choice_probabilities(test_df)
+
+    expected_probabilities = np.array(
+        [1 / 60, 1 / 60, 28 / 60, 1 / 60, 1 / 60, 28 / 60]
+    )
+
+    np.testing.assert_array_almost_equal(
+        test_df["Probability"].values, expected_probabilities
+    )
+    assert np.isclose(test_df["Probability"].sum(), 1)
+
+
+def test_get_chosen_indexes():
+    test_dff = pd.DataFrame(
+        {
+            "PersonId": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+            ],
+            "Probability": [1 / 70, 13 / 70, 28 / 70, 28 / 70, 0, 0],
+        }
+    )
+
+    num_choices = 10000
+
+    chosen_indexes = get_chosen_indexes(test_dff, num_choices=num_choices)
+
+    assert chosen_indexes.min() >= 0
+    assert chosen_indexes.max() < test_dff.shape[0]
+
+    for index in range(test_dff.shape[0]):
+        num_chosen_index = (chosen_indexes == index).sum()
+        assert np.isclose(
+            num_chosen_index / num_choices,
+            test_dff["Probability"].values[index],
+            atol=0.01,
+        ), f"{num_chosen_index / num_choices} == {test_dff['Probability'].values[index]}"
+
+
+def test_get_histories_mask():
+    test_df = pd.DataFrame(
+        {
+            "PersonId": [
+                1,
+                1,
+                1,
+                2,
+                2,
+                2,
+            ],
+            "AccountId": [
+                1,
+                1,
+                1,
+                2,
+                2,
+                2,
+            ],
+            "FloatColumn": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            "IntColumn": [1, 2, 3, 4, 5, 6],
+            "OccuredTime": [
+                np.datetime64("2024-01-01"),
+                np.datetime64("2024-01-02"),
+                np.datetime64("2024-01-03"),
+                np.datetime64("2024-01-04"),
+                np.datetime64("2024-01-05"),
+                np.datetime64("2024-01-06"),
+            ],
+        }
+    )
+
+    history_size = 6
+    ix = np.array([1, 5])
+
+    test_df = get_histories_mask(test_df, ix, history_size)
+    test_df.reset_index(drop=True, inplace=True)
+
     expected = pd.DataFrame(
         {
-            "AccountId": [12345],
-            "DefinitionId": ["one"],
-            "ApplicationId": [None],
-            "OccurredTime": ["2023-07-28 13:27:05.740736"],
-        },
-        index=pd.Index(["NextEvent"]),
+            "PersonId": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+            ],
+            "AccountId": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+            ],
+            "FloatColumn": [
+                np.nan,
+                np.nan,
+                np.nan,
+                np.nan,
+                1.0,
+                2.0,
+                np.nan,
+                np.nan,
+                np.nan,
+                4.0,
+                5.0,
+                6.0,
+            ],
+            "IntColumn": [-1, -1, -1, -1, 1, 2, -1, -1, -1, 4, 5, 6],
+            "OccuredTime": [
+                np.datetime64("NaT"),
+                np.datetime64("NaT"),
+                np.datetime64("NaT"),
+                np.datetime64("NaT"),
+                np.datetime64("2024-01-01"),
+                np.datetime64("2024-01-02"),
+                np.datetime64("NaT"),
+                np.datetime64("NaT"),
+                np.datetime64("NaT"),
+                np.datetime64("2024-01-04"),
+                np.datetime64("2024-01-05"),
+                np.datetime64("2024-01-06"),
+            ],
+            "HasHistory": [
+                False,
+                False,
+                False,
+                False,
+                True,
+                True,
+                False,
+                False,
+                False,
+                True,
+                True,
+                True,
+            ],
+        }
     )
 
-    expected["OccurredTime"] = pd.to_datetime(expected["OccurredTime"])
-    expected["DefinitionId"] = expected["DefinitionId"].astype("string[pyarrow]")
-    expected["ApplicationId"] = expected["ApplicationId"].astype("string[pyarrow]")
-
-    pd.testing.assert_frame_equal(
-        _get_next_event(user_history_df, t0=datetime(2023, 7, 19)), expected.T
-    )
+    pd.testing.assert_frame_equal(test_df, expected)
 
 
-def test_get_next_event_single_empty():
-    expected = pd.DataFrame(
+def test_get_last_valid_person_indexes_1():
+    test_df = pd.DataFrame(
         {
-            "AccountId": [None],
-            "DefinitionId": [None],
-            "ApplicationId": [None],
-            "OccurredTime": [None],
-        },
-        index=pd.Index(["NextEvent"]),
+            "PersonId": [
+                1,
+                1,
+                1,
+                2,
+                2,
+                2,
+            ],
+            "Probability": [1 / 60, 1 / 60, 28 / 60, 1 / 60, 1 / 60, 28 / 60],
+        }
     )
 
-    expected["OccurredTime"] = pd.to_datetime(expected["OccurredTime"])
-    expected["DefinitionId"] = expected["DefinitionId"].astype("string[pyarrow]")
-    expected["ApplicationId"] = expected["ApplicationId"].astype("string[pyarrow]")
+    last_valid_person_indexes = get_last_valid_person_indexes(test_df)
 
-    pd.testing.assert_frame_equal(
-        _get_next_event(user_history_df, t0=datetime(2023, 7, 29)), expected.T
-    )
+    assert last_valid_person_indexes.tolist() == [2, 5]
 
 
-@pytest.mark.skip("TODO: figure out multiindex construction")
-def test_get_next_event_group_by():
-    _ = pd.DataFrame(
+def test_get_last_valid_person_indexes_2():
+    test_df = pd.DataFrame(
         {
-            "AccountId": [None, 12345],
-            "DefinitionId": [None, "one"],
-            "ApplicationId": [None, None],
-            "OccurredTime": [None, "2023-07-28 13:27:05.740736"],
-            "PersonId": [1, 2],
-        },
-        index=pd.Index(["NextEvent"] * 2),
+            "PersonId": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+            ],
+            "Probability": [1 / 70, 13 / 70, 28 / 70, 28 / 70, 0, 0],
+        }
     )
 
-    print(get_next_event(user_histories_df, t0=datetime(2023, 7, 19)))  # noqa: T201
+    last_valid_person_indexes = get_last_valid_person_indexes(test_df)
+
+    assert last_valid_person_indexes.tolist() == [3]
 
 
-def test_create_user_histories():
-    # TODO: add asserts
-    create_user_histories(user_histories_df, t0=datetime(2023, 7, 16), history_size=2)
-
-
-def test_create_user_histories_single():
-    # TODO: add asserts
-    create_user_histories(user_history_df, t0=datetime(2023, 7, 16), history_size=2)
-
-
-def test_random_date():
-    assert (
-        datetime(2023, 7, 10)
-        < random_date(datetime(2023, 7, 10), datetime(2023, 7, 28))
-        < datetime(2023, 7, 28)
+def test_get_last_valid_person_indexes_3():
+    test_df = pd.DataFrame(
+        {
+            "PersonId": [
+                1,
+                1,
+                1,
+                1,
+                2,
+                2,
+                2,
+                2,
+            ],
+            "Probability": [1 / 70, 13 / 70, 28 / 70, 0, 1 / 70, 13 / 70, 28 / 70, 0],
+        }
     )
 
+    last_valid_person_indexes = get_last_valid_person_indexes(test_df)
 
-def test_sample_user_histories():
-    # TODO: patch random here and add asserts
-    user_histories_sample = sample_user_histories(
-        user_histories_df,
-        min_time=datetime(2023, 7, 9),
-        max_time=datetime(2023, 7, 20),
-        history_size=2,
-    )
-    print(user_histories_sample)  # noqa: T201
-
-
-def test_sample_user_histories_single():
-    # TODO: patch random here and add asserts
-    user_histories_sample = sample_user_histories(
-        user_history_df,
-        min_time=datetime(2023, 7, 9),
-        max_time=datetime(2023, 8, 20),
-        history_size=2,
-    )
-    print(user_histories_sample)  # noqa: T201
-
-
-def test_prepare_data_ddf():
-    # TODO: asserts
-    max_time = convert_datetime(
-        user_histories_ddf["OccurredTime"].describe().compute()["max"]
-    )
-    min_time = convert_datetime(
-        user_histories_ddf["OccurredTime"].describe().compute()["min"]
-    )
-
-    sampled_data = prepare_data(
-        user_histories_ddf, history_size=8, min_time=min_time, max_time=max_time
-    )
-
-    print(sampled_data.head(4, npartitions=-1))  # noqa: T201
-
-
-def test_prepare_data_ddf_single():
-    # TODO: asserts
-    max_time = convert_datetime(
-        user_history_ddf["OccurredTime"].describe().compute()["max"]
-    ) + timedelta(days=1)
-    min_time = convert_datetime(
-        user_history_ddf["OccurredTime"].describe().compute()["min"]
-    )
-
-    sampled_data = prepare_data(
-        user_history_ddf, history_size=8, min_time=min_time, max_time=max_time
-    )
-
-    print(sampled_data.head(4, npartitions=-1))  # noqa: T201
+    assert last_valid_person_indexes.tolist() == [2, 6]

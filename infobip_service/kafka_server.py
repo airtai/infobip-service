@@ -325,8 +325,8 @@ class ModelMetrics(BaseModel):
         ..., examples=[0.91], description="Area under ROC curve", ge=0.0, le=1.0
     )
     f1: float = Field(..., examples=[0.89], description="F-1 score", ge=0.0, le=1.0)
-    precission: float = Field(
-        ..., examples=[0.84], description="precission", ge=0.0, le=1.0
+    precision: float = Field(
+        ..., examples=[0.84], description="precision", ge=0.0, le=1.0
     )
     recall: float = Field(..., examples=[0.82], description="recall", ge=0.0, le=1.0)
     accuracy: float = Field(
