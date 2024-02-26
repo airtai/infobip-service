@@ -41,7 +41,7 @@ dynamic = ["version"]
 dependencies = [
     "torch>=1.10.0, <2.0.0",
     "tqdm>=4.66",
-    "faststream[kafka]==0.3.13",
+    "faststream[kafka]==0.4.4",
     "rocketry==2.5.1",
     "pydantic==1.10.14", # rocketry requires pydantic v1
     "traceback-with-variables==2.0.4",
