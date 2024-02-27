@@ -231,7 +231,7 @@ def test_pandas2dask():
                     "2023-07-10 13:27:04.617280",
                     "2023-07-10 13:27:05.740736",
                 ],
-                "DefinitionId": ["one", "one", "one", "two", "two", "three"],
+                "DefinitionId": pd.array(["one", "one", "one", "two", "two", "three"], dtype=pd.StringDtype("pyarrow")),
                 "ApplicationId": [None, None, None, None, None, None],
                 "OccurredTimeTicks": [
                     1688995620123456,
