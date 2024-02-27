@@ -231,7 +231,7 @@ def test_pandas2dask():
                     "2023-07-10 13:27:04.617280",
                     "2023-07-10 13:27:05.740736",
                 ],
-                "DefinitionId": pd.array(["one", "one", "one", "two", "two", "three"], dtype=pd.StringDtype("pyarrow")),
+                "DefinitionId": ["one", "one", "one", "two", "two", "three"],
                 "ApplicationId": [None, None, None, None, None, None],
                 "OccurredTimeTicks": [
                     1688995620123456,
@@ -245,8 +245,8 @@ def test_pandas2dask():
             index=pd.Index([1, 2, 2, 3, 3, 3], name="PersonId"),
         )
         expected["OccurredTime"] = pd.to_datetime(expected["OccurredTime"])
-        expected["DefinitionId"] = expected["DefinitionId"].astype("string[python]")
-        expected["ApplicationId"] = expected["ApplicationId"].astype("string[python]")
+        expected["DefinitionId"] = expected["DefinitionId"].astype("string[pyarrow]")
+        expected["ApplicationId"] = expected["ApplicationId"].astype("string[pyarrow]")
 
         pd.testing.assert_frame_equal(ddf.compute(), expected)
 
