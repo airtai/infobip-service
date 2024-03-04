@@ -39,7 +39,7 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
-    "torch>=1.10.0, <2.0.0",
+    "torch>=1.10.0, <3.0.0",
     "tqdm>=4.66",
     "faststream[kafka]==0.4.4",
     "rocketry==2.5.1",
