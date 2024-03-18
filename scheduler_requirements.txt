@@ -1,5 +1,5 @@
 rocketry==2.5.1
-pydantic==1.10.11
+pydantic==2.6.4
 aiokafka==0.8.1
 SQLAlchemy==1.4.41
 clickhouse-sqlalchemy==0.2.3
